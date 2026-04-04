@@ -1,0 +1,294 @@
+Screen {
+    layout: vertical;
+    overflow-y: auto;
+}
+
+MainScreen {
+    overflow: hidden;
+}
+
+/* ─── App Layout ─── */
+
+#app-layout {
+    width: 100%;
+    height: 1fr;
+}
+
+/* ─── Sidebar ─── */
+
+#sidebar {
+    width: 28;
+    height: 100%;
+    background: $surface;
+    border-right: tall $surface-lighten-2;
+}
+
+#sidebar.collapsed {
+    width: 8;
+}
+
+#sidebar-brand {
+    width: 100%;
+    text-align: center;
+    text-style: bold;
+    color: $accent;
+    padding: 1 1 0 1;
+}
+
+#sidebar-nav {
+    height: 1fr;
+    width: 100%;
+}
+
+.nav-group {
+    width: 100%;
+    text-style: bold;
+    color: $text-muted;
+    padding: 1 2 0 2;
+}
+
+.nav-btn {
+    width: 100%;
+    margin: 0 1;
+    min-width: 4;
+    border: none;
+}
+
+.nav-btn:hover {
+    background: $surface-lighten-1;
+}
+
+.nav-btn.-active {
+    background: $primary;
+    color: $text;
+    text-style: bold;
+}
+
+#sidebar-status {
+    width: 100%;
+    padding: 1 2 0 2;
+    color: $text-muted;
+}
+
+#sidebar-toggle {
+    width: 100%;
+    margin: 1 1 0 1;
+    min-width: 4;
+}
+
+#nav-quit {
+    width: 100%;
+    margin: 0 1 1 1;
+}
+
+/* ─── Content Area ─── */
+
+#content-area {
+    width: 1fr;
+    height: 100%;
+}
+
+#welcome-panel {
+    width: 100%;
+    height: 100%;
+    content-align: center middle;
+    color: $text-muted;
+}
+
+EncodeScreen,
+DecodeScreen,
+ScanScreen,
+CaptureScreen,
+VerifyScreen,
+InfoScreen,
+TrainingScreen,
+CalibrationScreen,
+DevicesScreen {
+    width: 100%;
+    height: 100%;
+}
+
+/* ─── Form Components ─── */
+
+.screen-title {
+    width: 100%;
+    content-align: center middle;
+    text-style: bold;
+    color: $accent;
+    padding: 1 0 0 0;
+    margin-bottom: 1;
+}
+
+.form-container {
+    width: 100%;
+    max-width: 110;
+    height: 100%;
+    padding: 0 3;
+}
+
+.section {
+    width: 100%;
+    height: auto;
+    border: round $surface-lighten-2;
+    padding: 0 2 1 2;
+    margin: 0 0 1 0;
+}
+
+.section-title {
+    width: 100%;
+    text-style: bold;
+    color: $accent;
+    margin-bottom: 0;
+}
+
+Label {
+    margin-top: 1;
+    text-style: bold;
+}
+
+Input {
+    margin: 0 0 1 0;
+}
+
+Select {
+    margin: 0 0 1 0;
+}
+
+.form-row {
+    width: 100%;
+    height: auto;
+    layout: horizontal;
+}
+
+.form-col {
+    width: 1fr;
+    height: auto;
+    padding: 0 1 0 0;
+}
+
+.form-col:last-child {
+    padding: 0;
+}
+
+.details-panel {
+    padding: 1 2;
+    margin: 0 0 1 0;
+    background: $surface;
+    min-height: 3;
+}
+
+.button-bar {
+    width: 100%;
+    height: auto;
+    align: center middle;
+    margin: 1 0;
+}
+
+.button-bar Button {
+    margin: 0 1;
+    min-width: 16;
+}
+
+ProgressBar {
+    margin: 1 0 0 0;
+}
+
+#status {
+    width: 100%;
+    content-align: center middle;
+    min-height: 2;
+    padding: 1 2;
+}
+
+.note {
+    width: 100%;
+    content-align: center middle;
+    color: $text-muted;
+    text-style: italic;
+    margin-bottom: 1;
+}
+
+/* ─── File Picker ─── */
+
+.picker-row {
+    width: 100%;
+    height: auto;
+    layout: horizontal;
+    margin: 0 0 1 0;
+}
+
+.picker-row Static {
+    width: 1fr;
+    height: auto;
+    padding: 0 1;
+    content-align: left middle;
+}
+
+.picker-row Button {
+    min-width: 14;
+}
+
+#picker-modal {
+    width: 80%;
+    height: 80%;
+    max-width: 100;
+    background: $surface;
+    border: tall $accent;
+    padding: 1 2;
+}
+
+#picker-title {
+    width: 100%;
+    content-align: center middle;
+    text-style: bold;
+    color: $accent;
+    margin-bottom: 1;
+}
+
+#picker-selection {
+    width: 100%;
+    padding: 0 1;
+    margin-bottom: 1;
+    color: $text;
+}
+
+#picker-tree {
+    width: 100%;
+    height: 1fr;
+    margin-bottom: 1;
+}
+
+#picker-buttons {
+    width: 100%;
+    height: auto;
+    align: center middle;
+}
+
+#picker-buttons Button {
+    margin: 0 1;
+    min-width: 14;
+}
+
+/* ─── Dual Panel (Devices) ─── */
+
+.dual-panel {
+    width: 100%;
+    height: auto;
+    layout: horizontal;
+}
+
+.dual-panel .panel {
+    width: 1fr;
+    height: auto;
+    padding: 0 1;
+}
+
+.panel-title {
+    text-style: bold;
+    color: $accent;
+    margin-bottom: 1;
+}
+
+Checkbox {
+    margin: 1 0;
+}

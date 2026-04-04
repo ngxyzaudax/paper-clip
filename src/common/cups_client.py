@@ -1,0 +1,92 @@
+import logging
+from pathlib import Path
+
+from common.types import PrinterCapabilities, PrinterInfo
+
+logger = logging.getLogger(__name__)
+
+CUPS_STATE_MAP = {3: "idle", 4: "printing", 5: "stopped"}
+
+
+def _get_connection() -> "cups.Connection | None":
+    try:
+        import cups
+        return cups.Connection()
+    except ImportError:
+        logger.warning("pycups not installed; printer discovery unavailable")
+        return None
+    except RuntimeError as exc:
+        logger.warning("CUPS connection failed: %s", exc)
+        return None
+
+
+def list_printers() -> list[PrinterInfo]:
+    conn = _get_connection()
+    if conn is None:
+        return []
+    try:
+        raw = conn.getPrinters()
+        default_name = conn.getDefault() or ""
+    except Exception as exc:
+        logger.warning("Failed to enumerate printers: %s", exc)
+        return []
+    return [
+        PrinterInfo(
+            name=name,
+            uri=info.get("device-uri", ""),
+            state=CUPS_STATE_MAP.get(info.get("printer-state", 0), "unknown"),
+            is_default=(name == default_name),
+        )
+        for name, info in raw.items()
+    ]
+
+
+def get_printer_capabilities(printer_name: str) -> PrinterCapabilities | None:
+    conn = _get_connection()
+    if conn is None:
+        return None
+    from common.cups_capabilities import get_printer_capabilities as _get_caps
+    return _get_caps(conn, printer_name)
+
+
+def print_file(
+    printer_name: str,
+    file_path: Path,
+    title: str = "paper-clip",
+    resolution: str | None = None,
+    paper_size: str | None = None,
+    color_mode: str | None = None,
+    duplex: str | None = None,
+) -> int | None:
+    conn = _get_connection()
+    if conn is None:
+        return None
+    options: dict[str, str] = {
+        "print-scaling": "none",
+    }
+    if not paper_size:
+        options["PageSize"] = "A4"
+    else:
+        options["PageSize"] = paper_size
+    if resolution:
+        options["Resolution"] = resolution
+    elif file_path.suffix.lower() == ".png":
+        from common.dpi_utils import read_png_dpi
+        embedded_dpi = read_png_dpi(file_path)
+        if embedded_dpi:
+            options["Resolution"] = f"{embedded_dpi}dpi"
+            logger.info("Using embedded DPI from PNG: %ddpi", embedded_dpi)
+    if color_mode:
+        options["ColorModel"] = color_mode
+    if duplex:
+        options["Duplex"] = duplex
+    try:
+        job_id = conn.printFile(printer_name, str(file_path), title, options)
+        logger.info(
+            "Submitted print job %d to %s (options: %s)",
+            job_id, printer_name, options,
+        )
+        return job_id
+    except Exception as exc:
+        logger.error("Print submission failed: %s", exc)
+        return None

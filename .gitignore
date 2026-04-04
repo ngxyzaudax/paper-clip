@@ -1,0 +1,62 @@
+# Python
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.venv
+
+# uv
+.uv/
+
+# ML
+src/ml/models/*.h5
+src/ml/models/*.keras
+src/ml/models/*.pt
+src/ml/models/*.pth
+src/ml/models/*.onnx
+src/ml/models/*.tflite
+data/training/
+data/jobs/
+data/models/
+
+# Datasets and calibration pipeline (large / generated)
+calibration-dataset/scans/
+calibration-dataset/output/
+calibration-dataset/ground_truth.json
+*.tfrecord
+*.tfrecord.gz
+*.npy
+*.npz
+*.parquet
+*.arrow
+*.feather
+*.tif
+*.tiff
+*.webp
+events.out.tfevents.*
+
+/scans/
+
+# Logs
+data/logs/
+
+# Images / output artifacts
+*.png
+*.jpg
+*.jpeg
+*.pdf
+a.png
+shannon.jpg
+shannon-lg.jpg
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
