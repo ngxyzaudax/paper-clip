@@ -7,7 +7,7 @@ from common.config import PaperClipConfig
 from common.config_store import list_profiles, load_profile
 from common.page_layout import data_capacity_bytes, grid_dimensions, page_image_size, usable_area_px
 from common.palette import palette_from_config
-from common.paper_sizes import DEFAULT_PAPER_SIZE, paper_size_dimensions, paper_size_options
+from common.paper_sizes import DEFAULT_PAPER_SIZE, config_with_page_dimensions, paper_size_options
 from common.symbols import bits_per_cell, symbol_count
 
 
@@ -51,10 +51,8 @@ class InfoScreen(Widget):
     def _refresh_display(self) -> None:
         if not self._config:
             return
-        from dataclasses import replace
         try:
-            w, h = paper_size_dimensions(self._paper_size)
-            config = replace(self._config, page_width_mm=w, page_height_mm=h)
+            config = config_with_page_dimensions(self._config, self._paper_size)
         except ValueError:
             config = self._config
         self._display_info(config)

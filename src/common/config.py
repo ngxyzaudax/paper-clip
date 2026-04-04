@@ -141,8 +141,6 @@ def resolve_config(
         if v is not None
     }
     if paper_size:
-        from common.paper_sizes import paper_size_dimensions
-        w, h = paper_size_dimensions(paper_size)
-        overrides["page_width_mm"] = w
-        overrides["page_height_mm"] = h
+        from common.paper_sizes import config_with_page_dimensions
+        base = config_with_page_dimensions(base, paper_size)
     return validate_config(replace(base, **overrides) if overrides else base)

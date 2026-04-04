@@ -1,6 +1,10 @@
+from collections.abc import Sequence
+
 import cv2
 import numpy as np
 from PIL import Image
+
+from common.tag_detection import TagDetection
 
 APRILTAG_FAMILY = "tag36h11"
 APRILTAG_CV2_DICT = cv2.aruco.DICT_APRILTAG_36h11
@@ -30,16 +34,16 @@ def render_apriltag(tag_id: int, size_px: int) -> Image.Image:
 
 
 def ordered_corner_centers(
-    detections: list[dict],
+    detections: Sequence[TagDetection],
 ) -> list[tuple[float, float]] | None:
     """Return tag centers in [TL, TR, BL, BR] order, or None if <3 found."""
-    by_id = {d["id"]: d for d in detections if d["id"] in CORNER_TAG_IDS}
+    by_id = {d.tag_id: d for d in detections if d.tag_id in CORNER_TAG_IDS}
     if len(by_id) < 3:
         return None
     centers: list[tuple[float, float] | None] = [None, None, None, None]
     for idx, tag_id in enumerate(CORNER_TAG_IDS):
         if tag_id in by_id:
-            c = by_id[tag_id]["center"]
+            c = by_id[tag_id].center
             centers[idx] = (float(c[0]), float(c[1]))
     if sum(c is not None for c in centers) == 3:
         centers = _infer_fourth_corner(centers)

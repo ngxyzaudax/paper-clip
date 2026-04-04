@@ -10,7 +10,7 @@ from textual.widgets import Button, Label, ProgressBar, Select, Static
 
 from common.config import PaperClipConfig
 from common.config_store import list_profiles, load_profile
-from common.paper_sizes import DEFAULT_PAPER_SIZE, paper_size_dimensions, paper_size_options
+from common.paper_sizes import DEFAULT_PAPER_SIZE, config_with_page_dimensions, paper_size_options
 from serialization.decode.pipeline import decode
 from serialization.encode.pipeline import render_pages
 
@@ -65,10 +65,8 @@ class VerifyScreen(Widget):
     def _apply_paper_size(self) -> None:
         if not self._config:
             return
-        from dataclasses import replace
         try:
-            w, h = paper_size_dimensions(self._paper_size)
-            self._config = replace(self._config, page_width_mm=w, page_height_mm=h)
+            self._config = config_with_page_dimensions(self._config, self._paper_size)
         except ValueError:
             pass
 

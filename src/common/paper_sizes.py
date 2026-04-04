@@ -1,3 +1,7 @@
+from dataclasses import replace
+
+from common.config import PaperClipConfig
+
 PAPER_SIZES: dict[str, tuple[float, float]] = {
     "A3": (297.0, 420.0),
     "A4": (210.0, 297.0),
@@ -21,6 +25,11 @@ def paper_size_dimensions(name: str) -> tuple[float, float]:
     if name not in PAPER_SIZES:
         raise ValueError(f"Unknown paper size: {name}. Available: {', '.join(PAPER_SIZES)}")
     return PAPER_SIZES[name]
+
+
+def config_with_page_dimensions(config: PaperClipConfig, paper_size: str) -> PaperClipConfig:
+    w, h = paper_size_dimensions(paper_size)
+    return replace(config, page_width_mm=w, page_height_mm=h)
 
 
 def detect_paper_size(width_mm: float, height_mm: float) -> str:

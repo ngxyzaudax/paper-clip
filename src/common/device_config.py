@@ -1,9 +1,8 @@
 import json
 import logging
 from pathlib import Path
-from typing import Any
-
 from common.data_store import DATA_ROOT
+from common.device_config_types import DeviceConfigFile, PrinterSettings, ScannerSettings
 
 logger = logging.getLogger(__name__)
 
@@ -11,11 +10,35 @@ CONFIG_DIR = DATA_ROOT
 DEVICE_CONFIG_FILE = CONFIG_DIR / "devices.json"
 LEGACY_SCANNER_FILE = CONFIG_DIR / "scanner.json"
 
-EMPTY_PRINTER = {"name": "", "dpi": 0, "paper_size": "A4"}
-EMPTY_SCANNER = {"device": "", "dpi": 1200, "mode": "Color"}
+EMPTY_PRINTER: PrinterSettings = {"name": "", "dpi": 0, "paper_size": "A4"}
+EMPTY_SCANNER: ScannerSettings = {"device": "", "dpi": 1200, "mode": "Color"}
 
 
-def _migrate_legacy() -> dict[str, Any] | None:
+def _merge_printer(raw: object) -> PrinterSettings:
+    name, dpi, paper_size = EMPTY_PRINTER["name"], EMPTY_PRINTER["dpi"], EMPTY_PRINTER["paper_size"]
+    if isinstance(raw, dict):
+        if "name" in raw:
+            name = str(raw["name"])
+        if "dpi" in raw:
+            dpi = int(raw["dpi"])
+        if "paper_size" in raw:
+            paper_size = str(raw["paper_size"])
+    return {"name": name, "dpi": dpi, "paper_size": paper_size}
+
+
+def _merge_scanner(raw: object) -> ScannerSettings:
+    device, dpi, mode = EMPTY_SCANNER["device"], EMPTY_SCANNER["dpi"], EMPTY_SCANNER["mode"]
+    if isinstance(raw, dict):
+        if "device" in raw:
+            device = str(raw["device"])
+        if "dpi" in raw:
+            dpi = int(raw["dpi"])
+        if "mode" in raw:
+            mode = str(raw["mode"])
+    return {"device": device, "dpi": dpi, "mode": mode}
+
+
+def _migrate_legacy() -> DeviceConfigFile | None:
     if not LEGACY_SCANNER_FILE.exists():
         return None
     try:
@@ -23,24 +46,26 @@ def _migrate_legacy() -> dict[str, Any] | None:
         return {
             "printer": dict(EMPTY_PRINTER),
             "scanner": {
-                "device": legacy.get("device", ""),
-                "dpi": legacy.get("dpi", 1200),
+                "device": str(legacy.get("device", "")),
+                "dpi": int(legacy.get("dpi", 1200)),
                 "mode": "Color",
             },
         }
-    except (json.JSONDecodeError, KeyError):
+    except (json.JSONDecodeError, KeyError, TypeError, ValueError):
         return None
 
 
-def load_device_config() -> dict[str, Any]:
+def load_device_config() -> DeviceConfigFile:
     if DEVICE_CONFIG_FILE.exists():
         try:
             raw = json.loads(DEVICE_CONFIG_FILE.read_text())
+            if not isinstance(raw, dict):
+                raise ValueError("invalid root")
             return {
-                "printer": {**EMPTY_PRINTER, **raw.get("printer", {})},
-                "scanner": {**EMPTY_SCANNER, **raw.get("scanner", {})},
+                "printer": _merge_printer(raw.get("printer")),
+                "scanner": _merge_scanner(raw.get("scanner")),
             }
-        except (json.JSONDecodeError, KeyError):
+        except (json.JSONDecodeError, KeyError, TypeError, ValueError):
             pass
     migrated = _migrate_legacy()
     if migrated:
@@ -49,7 +74,7 @@ def load_device_config() -> dict[str, Any]:
     return {"printer": dict(EMPTY_PRINTER), "scanner": dict(EMPTY_SCANNER)}
 
 
-def save_device_config(config: dict[str, Any]) -> None:
+def save_device_config(config: DeviceConfigFile) -> None:
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     DEVICE_CONFIG_FILE.write_text(json.dumps(config, indent=2))
     logger.info("Device configuration saved to %s", DEVICE_CONFIG_FILE)
@@ -71,9 +96,9 @@ def save_scanner_settings(
     save_device_config(config)
 
 
-def get_printer_settings() -> dict[str, Any]:
+def get_printer_settings() -> PrinterSettings:
     return load_device_config()["printer"]
 
 
-def get_scanner_settings() -> dict[str, Any]:
+def get_scanner_settings() -> ScannerSettings:
     return load_device_config()["scanner"]

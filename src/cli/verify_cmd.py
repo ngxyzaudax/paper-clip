@@ -84,10 +84,8 @@ def verify_command(
     if profile:
         config = load_profile(profile)
         if paper_size:
-            from dataclasses import replace
-            from common.paper_sizes import paper_size_dimensions
-            w, h = paper_size_dimensions(paper_size)
-            config = replace(config, page_width_mm=w, page_height_mm=h)
+            from common.paper_sizes import config_with_page_dimensions
+            config = config_with_page_dimensions(config, paper_size)
     else:
         config = resolve_config(config_file, num_colors, cell_size_px, paper_size)
 
