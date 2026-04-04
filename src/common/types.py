@@ -12,36 +12,6 @@ class Region(NamedTuple):
     height: int
 
 
-class HeaderData(NamedTuple):
-    magic: bytes
-    version: int
-    flags: int
-    num_colors: int
-    cell_size_px: int
-    ecc_symbols: int
-    scan_dpi: int
-    grid_cols: int
-    grid_rows: int
-    page_index: int
-    total_pages: int
-    data_pages: int
-    data_length: int
-    sha256_hash: bytes
-    header_crc: int
-    crc_valid: bool
-
-
-class PageInfo(NamedTuple):
-    filename: str
-    file_size: int
-    page_index: int
-    total_pages: int
-    data_pages: int
-    sha256_hash: bytes
-    encrypted: bool
-    timestamp: str
-
-
 class PrinterInfo(NamedTuple):
     name: str
     uri: str

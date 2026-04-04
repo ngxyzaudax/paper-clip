@@ -1,0 +1,4 @@
+{"sessionId": "d8460a", "timestamp": 1775294310493, "hypothesisId": "H1", "location": "alignment.py:module_load", "message": "alignment module symbols", "data": {"has_draw_finder_patterns": false, "has_draw_apriltag_layer": true}, "runId": "pre-fix"}
+{"sessionId": "d8460a", "timestamp": 1775294310502, "hypothesisId": "H2", "location": "renderer.py:module_load", "message": "renderer import chain completed", "data": {"draw_apriltag_layer_bound": true}, "runId": "post-fix"}
+{"sessionId": "d8460a", "timestamp": 1775294353888, "hypothesisId": "H2", "location": "renderer.py:module_load", "message": "renderer import chain completed", "data": {"draw_apriltag_layer_bound": true}, "runId": "post-fix"}
+{"sessionId": "d8460a", "timestamp": 1775294363679, "hypothesisId": "H2", "location": "renderer.py:module_load", "message": "renderer import chain completed", "data": {"draw_apriltag_layer_bound": true}, "runId": "post-fix"}

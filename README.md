@@ -1,6 +1,6 @@
 # paper-clip
 
-Serialize files to **physical paper** as high-resolution PNGs: a color-coded dot grid carries compressed, error-corrected data with QR headers and calibration marks. Scan or photograph the pages to recover the original file. Optional encryption, page-level parity, and SANE/CUPS integration support real print-and-scan workflows.
+Serialize files to **physical paper** as high-resolution PNGs: a color-coded dot grid carries compressed, error-corrected data with QR headers and calibration marks. Optional encryption and page-level parity are supported. The CLI and TUI focus on **encoding** and **hardware discovery** (printers and scanners).
 
 - **Python:** 3.13+ (see `.python-version`)
 - **CLI:** [Typer](https://typer.tiangolo.com/) — run `paper-clip` with arguments, or launch with **no arguments** for the [Textual](https://textual.textualize.io/) TUI.
@@ -10,7 +10,7 @@ Serialize files to **physical paper** as high-resolution PNGs: a color-coded dot
 ## Prerequisites
 
 - **[uv](https://docs.astral.sh/uv/)** — required. Install it [using the official instructions](https://docs.astral.sh/uv/getting-started/installation/) for your OS.
-- **Scanner / printer (optional):** [SANE](https://sane-project.gitlab.io/) for `scan` and `capture`, [CUPS](https://www.cups.org/) for `print` and `capture`. The Python packages `python-sane` and `pycups` need those backends available on the machine.
+- **Scanner / printer (optional):** for the `devices` command and **Devices** TUI tab, [SANE](https://sane-project.gitlab.io/) and [CUPS](https://www.cups.org/) backends plus the `python-sane` and `pycups` packages let the app list hardware and save defaults.
 
 ---
 
@@ -53,19 +53,10 @@ From the repository root:
 
 | Command | Purpose |
 |---------|---------|
-| `encode` | File → PNG page(s) |
-| `decode` | Image or folder of images → restored file |
-| `scan` | SANE → PNGs (jobs or session folder) |
-| `capture` | Encode, print, scan loop |
-| `print` | Send images to CUPS |
-| `devices` | Scanner / printer discovery and setup helpers |
-| `info` | Capacity and layout for a config profile |
-| `verify` | Encode in memory → decode → compare to source |
-| `config` | Manage TOML profiles under `data/configs/` |
-| `generate` | Random payload sized to N pages → encode into a job |
-| `extract-training`, `train` | Training data and TensorFlow cell classifier (`[ml]`; `ml.*` modules) |
+| `encode` | File → PNG page(s) (same workflow as **Encode File** in the TUI) |
+| `devices` | Scanner / printer discovery and defaults (same as **Devices** in the TUI) |
 
-Use `uv run paper-clip <command> --help` for flags (passphrase, classifier `auto`/`ml`/`rgb`, DPI, jobs, etc.), or run `paper-clip` directly after activating `.venv`.
+Use `uv run paper-clip <command> --help` for flags, or run `paper-clip` with no arguments for the TUI.
 
 ---
 
@@ -77,9 +68,8 @@ Use `uv run paper-clip <command> --help` for flags (passphrase, classifier `auto
 | `src/cli/` | Commands, Rich output, `cli/tui/` screens |
 | `src/common/` | Config, codec, compression, crypto, CUPS/SANE, layouts, types |
 | `src/serialization/encode/` | Encoder, pipeline, rendering, parity pages |
-| `src/serialization/decode/` | Load pages, align, read grid, decode |
 
-Runtime data lives under **`data/`**: `configs/` (profiles), `jobs/` (`digital/`, `scans/`, `decoded/`), and optionally `training/` and `models/` for ML.
+Runtime data lives under **`data/`**, mainly `jobs/` (`digital/`, `scans/`, etc.).
 
 ---
 
@@ -89,11 +79,9 @@ Runtime data lives under **`data/`**: `configs/` (profiles), `jobs/` (`digital/`
 
 2. **Symbols:** Bytes map to a multi-level alphabet (`num_colors`); more than one bit per cell when `num_colors` > 2 (`common/symbols.py`).
 
-3. **Pages:** PNG at `scan_dpi` with finders/alignment, **QR** header, optional **palette QR**, calibration bar, timing tracks, and the data grid (`serialization/encode/renderer.py`).
+3. **Pages:** PNG at `print_dpi` with finders/alignment, **QR** header, optional **palette QR**, calibration bar, timing tracks, and the data grid (`serialization/encode/renderer.py`).
 
 4. **Parity:** Extra pages from RS across pages can recover missing data pages when `redundancy_pages` > 0 (`common/fountain.py`).
-
-5. **Decode:** Deskew, align, sample cells, classify (RGB distance to references or optional ML), then reverse RS, decompress, decrypt, and verify the hash (`serialization/decode/`).
 
 ---
 

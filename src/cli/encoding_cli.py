@@ -1,0 +1,33 @@
+from pathlib import Path
+
+from common.config import PaperClipConfig, resolve_config
+
+
+def cli_encoding_config(
+    config_file: Path | None,
+    num_colors: int | None,
+    cell_size_px: int | None,
+    paper_size: str | None,
+    print_dpi: int | None,
+    rs_redundancy: float | None,
+    redundancy_pages: int | None,
+    margin_mm: float | None = None,
+    margin_top_mm: float | None = None,
+    margin_right_mm: float | None = None,
+    margin_bottom_mm: float | None = None,
+    margin_left_mm: float | None = None,
+) -> PaperClipConfig:
+    return resolve_config(
+        config_file=config_file,
+        num_colors=num_colors,
+        cell_size_px=cell_size_px,
+        paper_size=paper_size,
+        print_dpi=print_dpi,
+        rs_redundancy=rs_redundancy,
+        redundancy_pages=redundancy_pages,
+        margin_mm=margin_mm,
+        margin_top_mm=margin_top_mm,
+        margin_right_mm=margin_right_mm,
+        margin_bottom_mm=margin_bottom_mm,
+        margin_left_mm=margin_left_mm,
+    )

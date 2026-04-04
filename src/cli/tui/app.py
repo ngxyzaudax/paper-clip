@@ -6,12 +6,13 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Static
 
+from cli.tui.encode_screen import EncodeScreen
 from cli.tui.nav_config import (
+    DEFAULT_NAV_ID,
     NAV_FULL,
     NAV_GROUPS,
     NAV_SHORT,
     PANEL_REGISTRY,
-    WELCOME,
     status_text,
 )
 
@@ -35,16 +36,17 @@ class MainScreen(Screen):
                     for group_label, items in NAV_GROUPS:
                         yield Static(group_label, classes="nav-group")
                         for btn_id, label, _ in items:
-                            yield Button(label, id=btn_id, classes="nav-btn")
+                            yield Button(label, id=btn_id, classes="nav-btn", compact=True)
                 yield Static("", id="sidebar-status")
-                yield Button("◀ Collapse", id="sidebar-toggle")
-                yield Button("Quit", id="nav-quit", variant="error")
+                yield Button("◀ Collapse", id="sidebar-toggle", compact=True)
+                yield Button("Quit", id="nav-quit", variant="error", compact=True)
             with Vertical(id="content-area"):
-                yield Static(WELCOME, id="welcome-panel")
+                yield EncodeScreen()
         yield Footer()
 
     def on_mount(self) -> None:
         self.query_one("#sidebar-status", Static).update(status_text())
+        self.query_one(f"#{DEFAULT_NAV_ID}", Button).add_class("-active")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         btn_id = event.button.id

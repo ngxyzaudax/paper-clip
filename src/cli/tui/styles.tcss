@@ -1,30 +1,40 @@
 Screen {
     layout: vertical;
     overflow-y: auto;
+    scrollbar-size-vertical: 1;
+    scrollbar-size-horizontal: 1;
 }
 
 MainScreen {
     overflow: hidden;
 }
 
-/* ─── App Layout ─── */
+Button {
+    min-width: 4;
+}
+
+Header {
+    height: 1;
+}
+
+Footer {
+    height: 1;
+}
 
 #app-layout {
     width: 100%;
     height: 1fr;
 }
 
-/* ─── Sidebar ─── */
-
 #sidebar {
-    width: 28;
+    width: 15;
     height: 100%;
     background: $surface;
     border-right: tall $surface-lighten-2;
 }
 
 #sidebar.collapsed {
-    width: 8;
+    width: 6;
 }
 
 #sidebar-brand {
@@ -32,7 +42,7 @@ MainScreen {
     text-align: center;
     text-style: bold;
     color: $accent;
-    padding: 1 1 0 1;
+    padding: 0;
 }
 
 #sidebar-nav {
@@ -44,12 +54,12 @@ MainScreen {
     width: 100%;
     text-style: bold;
     color: $text-muted;
-    padding: 1 2 0 2;
+    padding: 0 0 0 0;
 }
 
 .nav-btn {
     width: 100%;
-    margin: 0 1;
+    margin: 0;
     min-width: 4;
     border: none;
 }
@@ -66,72 +76,135 @@ MainScreen {
 
 #sidebar-status {
     width: 100%;
-    padding: 1 2 0 2;
+    padding: 0;
     color: $text-muted;
 }
 
 #sidebar-toggle {
     width: 100%;
-    margin: 1 1 0 1;
+    margin: 0;
     min-width: 4;
 }
 
 #nav-quit {
     width: 100%;
-    margin: 0 1 1 1;
+    margin: 0;
 }
-
-/* ─── Content Area ─── */
 
 #content-area {
     width: 1fr;
     height: 100%;
 }
 
-#welcome-panel {
-    width: 100%;
-    height: 100%;
-    content-align: center middle;
-    color: $text-muted;
-}
-
 EncodeScreen,
-DecodeScreen,
-ScanScreen,
-CaptureScreen,
-VerifyScreen,
-InfoScreen,
-TrainingScreen,
-CalibrationScreen,
 DevicesScreen {
     width: 100%;
     height: 100%;
 }
 
-/* ─── Form Components ─── */
+.encode-screen-layout {
+    width: 100%;
+    height: 100%;
+    layout: vertical;
+}
+
+.encode-action-btn {
+    min-width: 10;
+    padding: 0 1;
+    margin: 0;
+}
+
+.encode-split {
+    width: 100%;
+    height: 1fr;
+    min-height: 6;
+    layout: horizontal;
+}
+
+.encode-form-col {
+    width: 1fr;
+    min-width: 36;
+    height: 100%;
+    min-height: 0;
+    layout: vertical;
+}
+
+.encode-form-col > .section {
+    width: 100%;
+    height: 1fr;
+    min-height: 0;
+    layout: vertical;
+}
+
+.encode-form-scroll {
+    width: 100%;
+    height: 1fr;
+    min-height: 0;
+}
+
+.encode-panel-title {
+    width: 100%;
+    height: auto;
+    text-style: bold;
+    color: $accent;
+    text-opacity: 100%;
+    margin-bottom: 0;
+}
+
+.encode-info-col {
+    width: 1fr;
+    min-width: 36;
+    height: 100%;
+    min-height: 0;
+    layout: vertical;
+}
+
+.encode-info-col > .section {
+    width: 100%;
+    height: 1fr;
+    layout: vertical;
+    min-height: 0;
+}
+
+.encode-info-scroll {
+    width: 100%;
+    height: 1fr;
+    min-height: 0;
+}
+
+#encode-info-display {
+    width: 100%;
+    height: auto;
+}
+
+.encode-bottom-scroll {
+    width: 100%;
+    height: 1fr;
+    min-height: 0;
+}
 
 .screen-title {
     width: 100%;
     content-align: center middle;
     text-style: bold;
     color: $accent;
-    padding: 1 0 0 0;
-    margin-bottom: 1;
+    padding: 0;
+    margin-bottom: 0;
+    height: auto;
 }
 
 .form-container {
     width: 100%;
-    max-width: 110;
     height: 100%;
-    padding: 0 3;
+    padding: 0;
 }
 
 .section {
     width: 100%;
     height: auto;
-    border: round $surface-lighten-2;
-    padding: 0 2 1 2;
-    margin: 0 0 1 0;
+    border: tall $surface-lighten-2;
+    padding: 0 0 0 0;
+    margin: 0 0 0 0;
 }
 
 .section-title {
@@ -139,19 +212,49 @@ DevicesScreen {
     text-style: bold;
     color: $accent;
     margin-bottom: 0;
+    text-opacity: 100%;
 }
 
 Label {
-    margin-top: 1;
-    text-style: bold;
+    margin-top: 0;
+    margin-bottom: 0;
+    text-style: none;
+    color: $text;
+    text-opacity: 88%;
+}
+
+.encode-input-section Label {
+    text-opacity: 100%;
+}
+
+.encode-input-section {
+    padding: 0;
+}
+
+.encode-password-block {
+    width: 100%;
+    height: auto;
+    margin-top: 0;
+}
+
+.encode-password-block Input {
+    width: 100%;
 }
 
 Input {
-    margin: 0 0 1 0;
+    margin: 0;
+    height: 1;
+    padding: 0 1;
+    scrollbar-size-horizontal: 0;
 }
 
 Select {
-    margin: 0 0 1 0;
+    margin: 0;
+    height: auto;
+}
+
+Select > SelectCurrent {
+    padding: 0 1;
 }
 
 .form-row {
@@ -163,7 +266,7 @@ Select {
 .form-col {
     width: 1fr;
     height: auto;
-    padding: 0 1 0 0;
+    padding: 0;
 }
 
 .form-col:last-child {
@@ -171,33 +274,37 @@ Select {
 }
 
 .details-panel {
-    padding: 1 2;
-    margin: 0 0 1 0;
+    padding: 0;
+    margin: 0;
     background: $surface;
-    min-height: 3;
+    min-height: 1;
 }
 
 .button-bar {
     width: 100%;
     height: auto;
     align: center middle;
-    margin: 1 0;
+    margin: 0;
 }
 
 .button-bar Button {
-    margin: 0 1;
-    min-width: 16;
+    margin: 0;
+    min-width: 8;
+}
+
+.button-bar .encode-action-btn {
+    min-width: 10;
 }
 
 ProgressBar {
-    margin: 1 0 0 0;
+    margin: 0;
 }
 
 #status {
     width: 100%;
     content-align: center middle;
-    min-height: 2;
-    padding: 1 2;
+    min-height: 1;
+    padding: 0;
 }
 
 .note {
@@ -205,27 +312,32 @@ ProgressBar {
     content-align: center middle;
     color: $text-muted;
     text-style: italic;
-    margin-bottom: 1;
+    margin-bottom: 0;
 }
-
-/* ─── File Picker ─── */
 
 .picker-row {
     width: 100%;
     height: auto;
     layout: horizontal;
-    margin: 0 0 1 0;
+    margin: 0;
+    padding: 0 1 0 0;
+}
+
+.picker-row Input {
+    width: 1fr;
+    margin: 0;
 }
 
 .picker-row Static {
     width: 1fr;
     height: auto;
-    padding: 0 1;
+    padding: 0;
     content-align: left middle;
 }
 
 .picker-row Button {
-    min-width: 14;
+    min-width: 10;
+    margin-left: 1;
 }
 
 #picker-modal {
@@ -234,7 +346,7 @@ ProgressBar {
     max-width: 100;
     background: $surface;
     border: tall $accent;
-    padding: 1 2;
+    padding: 0;
 }
 
 #picker-title {
@@ -242,20 +354,20 @@ ProgressBar {
     content-align: center middle;
     text-style: bold;
     color: $accent;
-    margin-bottom: 1;
+    margin-bottom: 0;
 }
 
 #picker-selection {
     width: 100%;
-    padding: 0 1;
-    margin-bottom: 1;
+    padding: 0;
+    margin-bottom: 0;
     color: $text;
 }
 
 #picker-tree {
     width: 100%;
     height: 1fr;
-    margin-bottom: 1;
+    margin-bottom: 0;
 }
 
 #picker-buttons {
@@ -265,30 +377,10 @@ ProgressBar {
 }
 
 #picker-buttons Button {
-    margin: 0 1;
-    min-width: 14;
-}
-
-/* ─── Dual Panel (Devices) ─── */
-
-.dual-panel {
-    width: 100%;
-    height: auto;
-    layout: horizontal;
-}
-
-.dual-panel .panel {
-    width: 1fr;
-    height: auto;
-    padding: 0 1;
-}
-
-.panel-title {
-    text-style: bold;
-    color: $accent;
-    margin-bottom: 1;
+    margin: 0;
+    min-width: 10;
 }
 
 Checkbox {
-    margin: 1 0;
+    margin: 0;
 }

@@ -19,17 +19,11 @@ dependencies = [
     "opencv-python-headless",
     "tomli-w",
     "qrcode>=8.2",
-    "pyzbar>=0.1.9",
     "argon2-cffi>=25.1.0",
     "cryptography>=46.0.6",
     "pycups",
     "python-sane",
-    "apriltag-python>=3.4.5",
-    "scikit-image>=0.26.0",
 ]
-
-[project.optional-dependencies]
-ml = ["tensorflow>=2.16"]
 
 [project.scripts]
 paper-clip = "main:main"

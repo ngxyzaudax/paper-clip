@@ -2,7 +2,7 @@ from textual import work
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widget import Widget
-from textual.widgets import Button, Checkbox, Select, Static
+from textual.widgets import Button, Select, Static
 
 from common.device_config import (
     get_scanner_settings,
@@ -22,31 +22,21 @@ class DevicesScreen(Widget):
     def compose(self) -> ComposeResult:
         with VerticalScroll(classes="form-container"):
             yield Static("Hardware Devices", classes="screen-title")
-            with Horizontal(classes="form-row"):
-                yield Checkbox("Show printers", value=True, id="chk-show-printers")
-                yield Checkbox("Show scanners", value=True, id="chk-show-scanners")
-            with Horizontal(classes="dual-panel"):
-                with Vertical(classes="panel", id="panel-printers"):
-                    yield Static("PRINTERS", classes="panel-title")
-                    yield Select([], prompt="Discovering...", id="printer-select")
-                    yield Static("", id="printer-caps", classes="details-panel")
-                with Vertical(classes="panel", id="panel-scanners"):
-                    yield Static("SCANNERS", classes="panel-title")
-                    yield Select([], prompt="Discovering...", id="scanner-select")
-                    yield Static("", id="scanner-caps", classes="details-panel")
+            with Vertical(classes="section", id="panel-printers"):
+                yield Static("PRINTERS", classes="section-title")
+                yield Select([], prompt="Discovering...", id="printer-select", compact=True)
+                yield Static("", id="printer-caps", classes="details-panel")
+            with Vertical(classes="section", id="panel-scanners"):
+                yield Static("SCANNERS", classes="section-title")
+                yield Select([], prompt="Discovering...", id="scanner-select", compact=True)
+                yield Static("", id="scanner-caps", classes="details-panel")
             with Horizontal(classes="button-bar"):
-                yield Button("Refresh", id="btn-refresh")
-                yield Button("Save Defaults", variant="primary", id="btn-save")
+                yield Button("Refresh", id="btn-refresh", compact=True)
+                yield Button("Save Defaults", variant="primary", id="btn-save", compact=True)
             yield Static("", id="status")
 
     def on_mount(self) -> None:
         self._discover_devices()
-
-    def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
-        if event.checkbox.id == "chk-show-printers":
-            self.query_one("#panel-printers", Vertical).display = event.value
-        elif event.checkbox.id == "chk-show-scanners":
-            self.query_one("#panel-scanners", Vertical).display = event.value
 
     @work(thread=True)
     def _discover_devices(self) -> None:

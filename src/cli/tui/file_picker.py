@@ -40,8 +40,8 @@ class FilePickerScreen(ModalScreen[Path | None]):
             yield Static("[dim]No selection[/dim]", id="picker-selection")
             yield FilteredTree(str(self._start), id="picker-tree")
             with Horizontal(id="picker-buttons"):
-                yield Button("Select", variant="primary", id="picker-select", disabled=True)
-                yield Button("Cancel", id="picker-cancel")
+                yield Button("Select", variant="primary", id="picker-select", disabled=True, compact=True)
+                yield Button("Cancel", id="picker-cancel", compact=True)
 
     def on_directory_tree_file_selected(self, event: DirectoryTree.FileSelected) -> None:
         if self._mode == "file":

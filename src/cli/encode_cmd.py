@@ -12,8 +12,8 @@ from cli.display import (
     print_error,
     print_success,
 )
-from common.config import PaperClipConfig, resolve_config
-from common.config_store import load_profile
+from cli.encoding_cli import cli_encoding_config
+from common.config import ALGO_FIELDS, PaperClipConfig
 from common.data_store import create_job, digital_dir
 from common.page_layout import data_capacity_bytes, grid_dimensions, page_image_size
 from common.palette import palette_from_config
@@ -63,49 +63,49 @@ def _show_encoding_plan(
     console.print(summary)
 
 
-def _resolve_config(
-    profile: str | None, config_file: Path | None,
-    num_colors: int | None, cell_size_px: int | None, paper_size: str | None,
-) -> tuple[PaperClipConfig, str]:
-    if profile:
-        config = load_profile(profile)
-        if paper_size:
-            from common.paper_sizes import config_with_page_dimensions
-            config = config_with_page_dimensions(config, paper_size)
-        return config, profile
-    return resolve_config(config_file, num_colors, cell_size_px, paper_size), "custom"
-
-
 def encode_command(
     input_file: Path = typer.Argument(..., help="File to encode"),
-    output: Path | None = typer.Option(None, help="Output path (default: data/jobs/<id>/digital/)"),
-    profile: str | None = typer.Option(None, help="Config profile name from configs/"),
-    config_file: Path | None = typer.Option(None, help="Config TOML file path"),
-    num_colors: int | None = typer.Option(None, help="Override num_colors"),
-    cell_size_px: int | None = typer.Option(None, help="Override cell_size_px"),
+    config_file: Path | None = typer.Option(None, "--config", help="Base settings from this TOML file"),
+    num_colors: int | None = typer.Option(None, help="Number of symbol colors"),
+    cell_size_px: int | None = typer.Option(None, help="Cell size in pixels"),
     paper_size: str | None = typer.Option(None, help="Paper size (A3, A4, A5, Letter, Legal, etc.)"),
+    print_dpi: int | None = typer.Option(None, help="Logical page DPI for layout and print hints"),
+    rs_redundancy: float | None = typer.Option(None, help="Reed–Solomon redundancy (0.05–0.50)"),
+    redundancy_pages: int | None = typer.Option(None, help="Extra parity pages (fountain)"),
+    margin_mm: float | None = typer.Option(None, help="Uniform page margin in mm (all sides)"),
+    margin_top_mm: float | None = typer.Option(None, help="Top page margin in mm"),
+    margin_right_mm: float | None = typer.Option(None, help="Right page margin in mm"),
+    margin_bottom_mm: float | None = typer.Option(None, help="Bottom page margin in mm"),
+    margin_left_mm: float | None = typer.Option(None, help="Left page margin in mm"),
     password: str | None = typer.Option(None, help="Encrypt with this password"),
-    save_password: str | None = typer.Option(None, help="Save password with this label"),
 ) -> None:
     """Encode a file into print-ready PNG page(s). Saves into data/jobs/ by default."""
     if not input_file.exists():
         print_error(f"File not found: {input_file}")
         raise typer.Exit(1)
 
-    config, profile_name = _resolve_config(profile, config_file, num_colors, cell_size_px, paper_size)
-    from common.config import FLAG_ENCRYPTED, ALGO_FIELDS
+    config = cli_encoding_config(
+        config_file, num_colors, cell_size_px, paper_size,
+        print_dpi, rs_redundancy, redundancy_pages, margin_mm,
+        margin_top_mm, margin_right_mm, margin_bottom_mm, margin_left_mm,
+    )
+    from common.config import FLAG_ENCRYPTED
+
     flags = FLAG_ENCRYPTED if password else 0
 
-    if output is None:
-        file_size = input_file.stat().st_size
-        total_pages = max(1, -(-file_size // data_capacity_bytes(config)))
-        config_dict = {k: getattr(config, k) for k in ALGO_FIELDS}
-        job_dir = create_job(input_file.name, profile_name, config_dict, total_pages)
-        output_base = digital_dir(job_dir) / "page"
-        console.print(f"[cyan]Job created: {job_dir}[/cyan]\n")
-    else:
-        output_base = output
-        job_dir = None
+    file_size = input_file.stat().st_size
+    total_pages = max(1, -(-file_size // data_capacity_bytes(config)))
+    config_dict = {k: getattr(config, k) for k in ALGO_FIELDS}
+    for k in (
+        "margin_top_mm",
+        "margin_right_mm",
+        "margin_bottom_mm",
+        "margin_left_mm",
+    ):
+        config_dict[k] = getattr(config, k)
+    job_dir = create_job(input_file.name, "inline", config_dict, total_pages)
+    output_base = digital_dir(job_dir) / "page"
+    console.print(f"[cyan]Job created: {job_dir}[/cyan]\n")
 
     _show_encoding_plan(input_file, output_base.parent, config)
     if password:
@@ -120,12 +120,6 @@ def encode_command(
             flags=flags, passphrase=password,
         )
 
-    if save_password and password:
-        from common.keystore import save_password as store_pw
-        store_pw(save_password, password)
-        console.print(f"[cyan]Password saved as '{save_password}'[/cyan]")
-
     for p in png_paths:
         print_success(f"Saved {p}")
-    if job_dir:
-        console.print(f"\n[bold]Job directory: {job_dir}[/bold]")
+    console.print(f"\n[bold]Job directory: {job_dir}[/bold]")

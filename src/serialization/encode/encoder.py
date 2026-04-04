@@ -12,7 +12,12 @@ from common.config import (
     PaperClipConfig,
 )
 from common.crypto import compute_sha256
-from common.page_layout import grid_dimensions, pages_needed
+from common.page_layout import (
+    data_capacity_bytes,
+    grid_dimensions,
+    pages_needed,
+    valid_cells_ordered,
+)
 from common.symbols import bytes_to_symbols
 from common.types import SymbolGrid
 
@@ -52,13 +57,14 @@ def _split_into_blocks(data: bytes, block_size: int) -> list[bytes]:
     ]
 
 
-def _build_page_grid(
-    symbols: list[int], page: int, cells_per_page: int, cols: int, rows: int
+def _sparse_symbol_grid(
+    symbols: list[int], cols: int, rows: int, valid_order: list[tuple[int, int]],
 ) -> SymbolGrid:
-    start = page * cells_per_page
-    page_symbols = symbols[start : start + cells_per_page]
-    page_symbols = page_symbols + [-1] * (cells_per_page - len(page_symbols))
-    return [page_symbols[row * cols : (row + 1) * cols] for row in range(rows)]
+    grid: list[list[int]] = [[-1] * cols for _ in range(rows)]
+    for i, (row, col) in enumerate(valid_order):
+        if i < len(symbols):
+            grid[row][col] = symbols[i]
+    return grid
 
 
 def payload_to_symbol_grids(
@@ -66,13 +72,15 @@ def payload_to_symbol_grids(
     config: PaperClipConfig,
     total_pages: int,
 ) -> list[SymbolGrid]:
-    symbols = bytes_to_symbols(payload, config.num_colors)
     cols, rows = grid_dimensions(config)
-    cells_per_page = cols * rows
-    return [
-        _build_page_grid(symbols, page, cells_per_page, cols, rows)
-        for page in range(total_pages)
-    ]
+    valid_order = valid_cells_ordered(config)
+    cap = data_capacity_bytes(config)
+    grids: list[SymbolGrid] = []
+    for page in range(total_pages):
+        chunk = payload[page * cap : (page + 1) * cap]
+        syms = bytes_to_symbols(chunk, config.num_colors)
+        grids.append(_sparse_symbol_grid(syms, cols, rows, valid_order))
+    return grids
 
 
 def compute_total_pages(raw_size: int, config: PaperClipConfig) -> int:

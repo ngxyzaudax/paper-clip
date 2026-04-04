@@ -6,17 +6,8 @@ import qrcode
 from PIL import Image
 from qrcode.constants import ERROR_CORRECT_M
 
-from common.config import (
-    FORMAT_VERSION,
-    HEADER_STRUCT,
-    MAGIC,
-    PaperClipConfig,
-    QR_BORDER_MODULES,
-    QR_MODULE_PX,
-    QR_VERSION,
-)
+from common.config import FORMAT_VERSION, MAGIC, PaperClipConfig, QR_BORDER_MODULES, QR_MODULE_PX, QR_VERSION
 from common.page_layout import grid_dimensions, margin_offset, qr_region
-from common.types import HeaderData
 
 
 def encode_header_bytes(
@@ -41,7 +32,7 @@ def encode_header_bytes(
         config.num_colors,
         config.cell_size_px,
         ecc_sym,
-        config.scan_dpi,
+        config.print_dpi,
         cols,
         rows,
         page_index,
@@ -54,36 +45,8 @@ def encode_header_bytes(
     return payload + struct.pack(">I", crc)
 
 
-def decode_header_bytes(data: bytes) -> HeaderData:
-    unpacked = HEADER_STRUCT.unpack(data[:HEADER_STRUCT.size])
-    payload = data[: HEADER_STRUCT.size - 4]
-    actual_crc = zlib.crc32(payload) & 0xFFFFFFFF
-    return HeaderData(
-        magic=unpacked[0],
-        version=unpacked[1],
-        flags=unpacked[2],
-        num_colors=unpacked[3],
-        cell_size_px=unpacked[4],
-        ecc_symbols=unpacked[5],
-        scan_dpi=unpacked[6],
-        grid_cols=unpacked[7],
-        grid_rows=unpacked[8],
-        page_index=unpacked[9],
-        total_pages=unpacked[10],
-        data_pages=unpacked[11],
-        data_length=unpacked[12],
-        sha256_hash=unpacked[13],
-        header_crc=unpacked[14],
-        crc_valid=actual_crc == unpacked[14],
-    )
-
-
 def header_to_qr_payload(header_bytes: bytes) -> str:
     return base64.b64encode(header_bytes).decode("ascii")
-
-
-def qr_payload_to_header(qr_data: bytes) -> bytes:
-    return base64.b64decode(qr_data)
 
 
 def _generate_qr_image(data: bytes) -> Image.Image:

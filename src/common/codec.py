@@ -23,10 +23,6 @@ def rs_encode_block(data: bytes, ecc_symbols: int) -> bytes:
     return bytes(_get_codec(ecc_symbols).encode(data))
 
 
-def rs_decode_block(data: bytes, ecc_symbols: int) -> bytes:
-    return bytes(_get_codec(ecc_symbols).decode(data)[0])
-
-
 def interleave_blocks(blocks: list[bytes]) -> bytes:
     if not blocks:
         return b""
@@ -39,14 +35,3 @@ def interleave_blocks(blocks: list[bytes]) -> bytes:
                 result[idx] = block[col]
                 idx += 1
     return bytes(result)
-
-
-def deinterleave_blocks(data: bytes, num_blocks: int, block_size: int) -> list[bytes]:
-    blocks: list[bytearray] = [bytearray() for _ in range(num_blocks)]
-    idx = 0
-    for col in range(block_size):
-        for block_idx in range(num_blocks):
-            if idx < len(data):
-                blocks[block_idx].append(data[idx])
-                idx += 1
-    return [bytes(b) for b in blocks]

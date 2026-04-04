@@ -1,6 +1,12 @@
 import math
 
+from common.config import DOT_GAIN_FACTOR, PaperClipConfig
 from common.types import RGB
+
+
+def dot_fill_fraction(cell_size: int) -> float:
+    _ = cell_size
+    return 1.0 / DOT_GAIN_FACTOR
 
 
 def _hsl_to_rgb(h: float, s: float, l: float) -> RGB:
@@ -61,25 +67,11 @@ def _maximize_rgb_separation(candidates: list[RGB], num_colors: int) -> list[RGB
     return [candidates[i] for i in selected]
 
 
-def generate_palette(
-    num_colors: int,
-    calibrated_pool: list[RGB] | None = None,
-) -> list[RGB]:
-    if calibrated_pool and len(calibrated_pool) >= num_colors:
-        filtered = [c for c in calibrated_pool if not _is_too_close_to_blank(c)]
-        if len(filtered) >= num_colors:
-            return _maximize_rgb_separation(filtered, num_colors)
+def generate_palette(num_colors: int) -> list[RGB]:
     candidates = [(0, 0, 0)] + _hue_based_palette(max(num_colors * 4, 36))
     candidates = [c for c in candidates if not _is_too_close_to_blank(c)]
     return _maximize_rgb_separation(candidates, num_colors)
 
 
-def palette_from_config(config: "PaperClipConfig") -> list[RGB]:
-    from common.config import PaperClipConfig
-    pool = list(config.calibrated_colors) if config.calibrated_colors else None
-    return generate_palette(config.num_colors, calibrated_pool=pool)
-
-
-def dot_fill_fraction(cell_size_px: int) -> float:
-    from common.config import DOT_GAIN_FACTOR, GUARD_BAND_PX
-    return min(0.9, (1.0 - 2.0 * GUARD_BAND_PX / cell_size_px) / DOT_GAIN_FACTOR)
+def palette_from_config(config: PaperClipConfig) -> list[RGB]:
+    return generate_palette(config.num_colors)

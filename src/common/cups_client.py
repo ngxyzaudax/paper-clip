@@ -1,5 +1,4 @@
 import logging
-from pathlib import Path
 
 from common.types import PrinterCapabilities, PrinterInfo
 
@@ -47,46 +46,3 @@ def get_printer_capabilities(printer_name: str) -> PrinterCapabilities | None:
         return None
     from common.cups_capabilities import get_printer_capabilities as _get_caps
     return _get_caps(conn, printer_name)
-
-
-def print_file(
-    printer_name: str,
-    file_path: Path,
-    title: str = "paper-clip",
-    resolution: str | None = None,
-    paper_size: str | None = None,
-    color_mode: str | None = None,
-    duplex: str | None = None,
-) -> int | None:
-    conn = _get_connection()
-    if conn is None:
-        return None
-    options: dict[str, str] = {
-        "print-scaling": "none",
-    }
-    if not paper_size:
-        options["PageSize"] = "A4"
-    else:
-        options["PageSize"] = paper_size
-    if resolution:
-        options["Resolution"] = resolution
-    elif file_path.suffix.lower() == ".png":
-        from common.dpi_utils import read_png_dpi
-        embedded_dpi = read_png_dpi(file_path)
-        if embedded_dpi:
-            options["Resolution"] = f"{embedded_dpi}dpi"
-            logger.info("Using embedded DPI from PNG: %ddpi", embedded_dpi)
-    if color_mode:
-        options["ColorModel"] = color_mode
-    if duplex:
-        options["Duplex"] = duplex
-    try:
-        job_id = conn.printFile(printer_name, str(file_path), title, options)
-        logger.info(
-            "Submitted print job %d to %s (options: %s)",
-            job_id, printer_name, options,
-        )
-        return job_id
-    except Exception as exc:
-        logger.error("Print submission failed: %s", exc)
-        return None

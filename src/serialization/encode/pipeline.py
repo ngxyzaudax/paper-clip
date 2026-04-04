@@ -3,13 +3,13 @@ from pathlib import Path
 
 from PIL import Image
 
-from common.config import FLAG_ENCRYPTED, FLAG_HAS_PALETTE_QR, PaperClipConfig
+from common.config import FLAG_ENCRYPTED, PaperClipConfig
 from serialization.encode.encoder import (
     compute_total_pages,
     payload_to_symbol_grids,
     prepare_payload,
 )
-from serialization.encode.parity_render import OnPageComplete, make_page_info, render_parity_pages
+from serialization.encode.parity_render import OnPageComplete, render_parity_pages
 from serialization.encode.renderer import render_page
 
 logger = logging.getLogger(__name__)
@@ -24,8 +24,6 @@ def render_pages(
 ) -> list[Image.Image]:
     if passphrase:
         flags |= FLAG_ENCRYPTED
-    if config.calibrated_colors:
-        flags |= FLAG_HAS_PALETTE_QR
     raw_data = input_path.read_bytes()
     file_size = len(raw_data)
     logger.info("Read %d bytes from %s", file_size, input_path)
@@ -40,12 +38,9 @@ def render_pages(
 
     images: list[Image.Image] = []
     for page_idx, grid in enumerate(grids):
-        info = make_page_info(
-            input_path, file_size, page_idx, total_pages, data_pages, sha256_hash, flags,
-        )
         image = render_page(
             grid, page_idx, total_pages, data_pages,
-            sha256_hash, file_size, config, flags, info,
+            sha256_hash, file_size, config, flags,
         )
         images.append(image)
         if on_page_complete:
@@ -54,7 +49,7 @@ def render_pages(
     if config.redundancy_pages > 0:
         images.extend(render_parity_pages(
             payload, config, data_pages, total_pages,
-            sha256_hash, file_size, flags, input_path, on_page_complete,
+            sha256_hash, file_size, flags, on_page_complete,
         ))
     return images
 
@@ -77,6 +72,6 @@ def encode(
     output_base.parent.mkdir(parents=True, exist_ok=True)
     paths = _output_paths(output_base, len(images))
     for img, path in zip(images, paths):
-        img.save(str(path), format="PNG", compress_level=1, dpi=(config.scan_dpi, config.scan_dpi))
-        logger.info("Saved %s (%dx%d, lossless PNG @ %d dpi)", path, img.width, img.height, config.scan_dpi)
+        img.save(str(path), format="PNG", compress_level=1, dpi=(config.print_dpi, config.print_dpi))
+        logger.info("Saved %s (%dx%d, lossless PNG @ %d dpi)", path, img.width, img.height, config.print_dpi)
     return paths
