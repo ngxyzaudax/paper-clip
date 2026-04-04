@@ -16,6 +16,8 @@ class DecodeScreen(Widget):
         super().__init__()
         self._source_path: Path | None = None
         self._passphrase: str | None = None
+        self._save_pw_label_snapshot: str = ""
+        self._classifier_snapshot: str = "auto"
 
     def compose(self) -> ComposeResult:
         with VerticalScroll(classes="form-container"):
@@ -41,6 +43,8 @@ class DecodeScreen(Widget):
                     with Vertical(classes="form-col"):
                         yield Label("Password")
                         yield Input(placeholder="decryption password", password=True, id="password-input")
+                yield Label("Save password in keystore as (optional)")
+                yield Input(placeholder="label, after successful decode", id="save-pw-label")
                 yield Label("Output File")
                 yield Input(value="./decoded_output", id="output-file")
             with Horizontal(classes="button-bar"):
@@ -106,6 +110,9 @@ class DecodeScreen(Widget):
         btn.disabled = True
 
     def _start_decode(self) -> None:
+        self._save_pw_label_snapshot = self.query_one("#save-pw-label", Input).value.strip()
+        cv = self.query_one("#classifier-select", Select).value
+        self._classifier_snapshot = str(cv) if cv != Select.BLANK else "auto"
         self._output_path = Path(self.query_one("#output-file", Input).value).expanduser()
         self.query_one("#btn-decode", Button).disabled = True
         self.query_one("#status", Static).update("[bold]Decoding...[/bold]")
@@ -119,21 +126,24 @@ class DecodeScreen(Widget):
         def on_page(idx: int, total: int, path: Path | None) -> None:
             self.app.call_from_thread(self._set_progress, idx + 1, total)
 
-        classifier = self.query_one("#classifier-select", Select).value or "auto"
+        save_lbl = self._save_pw_label_snapshot
 
         try:
             result, original_filename = decode(
                 source, output_path, on_page_decoded=on_page,
-                passphrase=self._passphrase, classifier=classifier,
+                passphrase=self._passphrase, classifier=self._classifier_snapshot,
             )
             final_path = output_path.parent / original_filename if original_filename else output_path
-            self.app.call_from_thread(
-                self._on_done,
+            done_msg = (
                 f"[bold green]Decoded {len(result):,} bytes to {final_path}\n"
                 f"Original filename: {original_filename or 'unknown'}\n"
-                f"SHA-256 integrity verified[/bold green]",
-                True,
+                f"SHA-256 integrity verified[/bold green]"
             )
+            if save_lbl and self._passphrase:
+                from common.keystore import save_password as store_pw
+                store_pw(save_lbl, self._passphrase)
+                done_msg += f"\n[cyan]Password saved as '{save_lbl}'[/cyan]"
+            self.app.call_from_thread(self._on_done, done_msg, True)
         except Exception as e:
             self.app.call_from_thread(self._on_done, f"[bold red]Error: {e}[/bold red]", False)
 

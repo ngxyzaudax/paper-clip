@@ -1,12 +1,15 @@
 import json
 import logging
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
+from multiprocessing import get_context
 from pathlib import Path
 
 import cv2
 import numpy as np
 
 from orientation import map_cw_rotated_to_original
+from pool_util import max_cpu_workers
 
 log = logging.getLogger(__name__)
 
@@ -17,6 +20,9 @@ SCANS_DIR = Path(__file__).parent / "scans"
 
 TEMPLATE_HALF = 200
 MATCH_THRESHOLD = 0.35
+
+_mp_chart_gray: np.ndarray | None = None
+_mp_corners: dict[str, list[int]] | None = None
 
 
 @dataclass(frozen=True)
@@ -260,22 +266,50 @@ def detect_corners_oriented(
     return best_k, mapped
 
 
+def _mp_detect_state_init(chart_abs: str, gt_abs: str) -> None:
+    global _mp_chart_gray, _mp_corners
+    cv2.setNumThreads(1)
+    chart_bgr = cv2.imread(chart_abs)
+    if chart_bgr is None:
+        raise FileNotFoundError(chart_abs)
+    _mp_chart_gray = cv2.cvtColor(chart_bgr, cv2.COLOR_BGR2GRAY)
+    _mp_corners = json.loads(Path(gt_abs).read_text())["corners"]
+
+
+def _mp_detect_one_task(path_and_threshold: tuple[str, float]) -> tuple[str, list[CornerDetection]]:
+    path_str, threshold = path_and_threshold
+    assert _mp_chart_gray is not None and _mp_corners is not None
+    scan_gray = _load_gray(Path(path_str))
+    dets = detect_corners_in_scan(scan_gray, _mp_chart_gray, _mp_corners, threshold)
+    return Path(path_str).name, dets
+
+
 def detect_all_scans(
     threshold: float = MATCH_THRESHOLD,
+    max_workers: int | None = None,
 ) -> dict[str, list[CornerDetection]]:
-    gt = _load_ground_truth()
-    corners = gt["corners"]
-    chart_gray = _load_gray(CHART_PATH)
-    results = {}
-
     scan_paths = sorted(SCANS_DIR.glob("scan*.png"))
-    for scan_path in scan_paths:
-        scan_gray = _load_gray(scan_path)
-        detections = detect_corners_in_scan(scan_gray, chart_gray, corners, threshold)
-        results[scan_path.name] = detections
-        detected_names = [d.name for d in detections]
-        scores = [f"{d.score:.3f}" for d in detections]
-        print(f"{scan_path.name}: {len(detections)}/4 corners detected {detected_names} scores={scores}")
+    if not scan_paths:
+        return {}
+
+    chart_abs = str(CHART_PATH.resolve())
+    gt_abs = str(GROUND_TRUTH_PATH.resolve())
+    n_workers = max(1, max_workers if max_workers is not None else max_cpu_workers())
+    items = [(str(p.resolve()), threshold) for p in scan_paths]
+
+    results: dict[str, list[CornerDetection]] = {}
+    ctx = get_context("spawn")
+    with ProcessPoolExecutor(
+        max_workers=n_workers,
+        mp_context=ctx,
+        initializer=_mp_detect_state_init,
+        initargs=(chart_abs, gt_abs),
+    ) as pool:
+        for name, detections in pool.map(_mp_detect_one_task, items):
+            results[name] = detections
+            detected_names = [d.name for d in detections]
+            scores = [f"{d.score:.3f}" for d in detections]
+            print(f"{name}: {len(detections)}/4 corners detected {detected_names} scores={scores}")
 
     return results
 

@@ -6,7 +6,7 @@ from rich.table import Table
 
 from cli.display import config_table, print_success
 from common.config import PaperClipConfig, default_config, load_config, save_config
-from common.config_store import list_profiles, save_profile
+from common.config_store import list_profiles
 from common.page_layout import data_capacity_bytes, grid_dimensions
 from common.symbols import bits_per_cell, symbol_count
 
@@ -20,6 +20,30 @@ def _config_to_rows(config: PaperClipConfig) -> list[tuple[str, str]]:
         ("scan_dpi", str(config.scan_dpi)),
         ("rs_redundancy", str(config.rs_redundancy)),
     ]
+
+
+def format_profiles_listing() -> str:
+    profiles = list_profiles()
+    if not profiles:
+        return "[dim]No profiles found[/dim]"
+    return "\n".join(f"[bold]{name}[/bold]\n  {path}" for name, path in profiles)
+
+
+def format_config_description(config: PaperClipConfig) -> str:
+    rows = _config_to_rows(config)
+    lines = [f"{k}: {v}" for k, v in rows]
+    cols, row_count = grid_dimensions(config)
+    bpc = bits_per_cell(config.num_colors)
+    sc = symbol_count(config.num_colors)
+    capacity = data_capacity_bytes(config)
+    lines.append("")
+    lines.append("[bold cyan]Derived[/bold cyan]")
+    lines.append(f"Symbol count: {sc}")
+    lines.append(f"Bits per cell: {bpc:.2f}")
+    lines.append(f"Grid size: {cols} x {row_count}")
+    lines.append(f"Total cells: {cols * row_count:,}")
+    lines.append(f"Capacity/page: {capacity:,} bytes ({capacity / 1024:.1f} KB)")
+    return "\n".join(lines)
 
 
 def _show_derived_stats(config: PaperClipConfig) -> None:

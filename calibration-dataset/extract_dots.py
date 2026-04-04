@@ -1,9 +1,12 @@
 import json
-from collections import Counter
+from concurrent.futures import ProcessPoolExecutor
+from multiprocessing import get_context
 from pathlib import Path
 
 import cv2
 import numpy as np
+
+from pool_util import max_cpu_workers
 
 
 GROUND_TRUTH_PATH = Path(__file__).parent / "ground_truth.json"
@@ -12,6 +15,9 @@ SAMPLES_DIR = Path(__file__).parent / "output" / "samples"
 
 MIN_CROP_BRIGHTNESS = 30
 MIN_CROP_STD = 3.0
+
+_mp_gt: dict | None = None
+_mp_num_colors: int = 0
 
 
 def _load_ground_truth() -> dict:
@@ -120,6 +126,25 @@ def _save_montage(
     cv2.imwrite(str(output_path), montage)
 
 
+def _write_sample_montages_for_scan(
+    scan_name: str, result: dict, gt: dict, num_colors: int,
+) -> None:
+    SAMPLES_DIR.mkdir(parents=True, exist_ok=True)
+    for band in gt["bands"]:
+        cs = band["cell_size"]
+        band_crops = [
+            c for c, idx in zip(result["crops"], result["dot_indices"])
+            if gt["dots"][idx]["cell_size"] == cs
+        ]
+        band_labels = [
+            l for l, idx in zip(result["labels"], result["dot_indices"])
+            if gt["dots"][idx]["cell_size"] == cs
+        ]
+        if band_crops:
+            montage_path = SAMPLES_DIR / f"{scan_name.replace('.png', '')}_{cs}px.png"
+            _save_montage(band_crops, band_labels, cs, num_colors, montage_path)
+
+
 def extract_and_report(scan_name: str, gt: dict) -> dict:
     aligned_path = ALIGNED_DIR / scan_name
     aligned = cv2.imread(str(aligned_path))
@@ -137,21 +162,74 @@ def extract_and_report(scan_name: str, gt: dict) -> dict:
     }
 
 
-def extract_all_scans(save_samples: bool = True) -> dict[str, dict]:
+def _mp_extract_init(gt_abs: str, num_colors: int) -> None:
+    global _mp_gt, _mp_num_colors
+    cv2.setNumThreads(1)
+    _mp_gt = json.loads(Path(gt_abs).read_text())
+    _mp_num_colors = num_colors
+
+
+def _mp_extract_task(name_and_save: tuple[str, bool]) -> tuple[str, dict, int]:
+    scan_name, save_samples = name_and_save
+    assert _mp_gt is not None
+    result = extract_and_report(scan_name, _mp_gt)
+    stats = result["stats"]
+    if save_samples:
+        _write_sample_montages_for_scan(scan_name, result, _mp_gt, _mp_num_colors)
+    return scan_name, stats, len(result["crops"])
+
+
+def extract_all_scans(
+    save_samples: bool = True, max_workers: int | None = None,
+) -> dict[str, dict]:
     gt = _load_ground_truth()
     num_colors = len(gt["colors"])
 
     if save_samples:
         SAMPLES_DIR.mkdir(parents=True, exist_ok=True)
 
-    results = {}
-    for scan_path in sorted(ALIGNED_DIR.glob("scan*.png")):
-        scan_name = scan_path.name
-        print(f"Extracting from {scan_name}...")
-        result = extract_and_report(scan_name, gt)
-        stats = result["stats"]
-        print(f"  Extracted: {stats['extracted']}/{stats['total']} ({stats['rate']:.1%})")
+    scan_names = [p.name for p in sorted(ALIGNED_DIR.glob("scan*.png"))]
+    if not scan_names:
+        return {}
 
+    n_workers = max(1, max_workers if max_workers is not None else max_cpu_workers())
+    gt_abs = str(GROUND_TRUTH_PATH.resolve())
+
+    results: dict[str, dict] = {}
+    if n_workers <= 1:
+        for scan_name in scan_names:
+            print(f"Extracting from {scan_name}...")
+            result = extract_and_report(scan_name, gt)
+            stats = result["stats"]
+            print(f"  Extracted: {stats['extracted']}/{stats['total']} ({stats['rate']:.1%})")
+            low_bands = [
+                f"{sz}px({info['rate']:.0%})"
+                for sz, info in sorted(stats["per_band"].items())
+                if info["rate"] < 0.95
+            ]
+            if low_bands:
+                print(f"  Low extraction: {', '.join(low_bands)}")
+            if save_samples:
+                _write_sample_montages_for_scan(scan_name, result, gt, num_colors)
+            results[scan_name] = {
+                "stats": stats,
+                "num_crops": len(result["crops"]),
+            }
+        return results
+
+    tasks = [(n, save_samples) for n in scan_names]
+    ctx = get_context("spawn")
+    with ProcessPoolExecutor(
+        max_workers=n_workers,
+        mp_context=ctx,
+        initializer=_mp_extract_init,
+        initargs=(gt_abs, num_colors),
+    ) as pool:
+        rows = list(pool.map(_mp_extract_task, tasks))
+    rows.sort(key=lambda r: r[0])
+    for scan_name, stats, num_crops in rows:
+        print(f"Extracting from {scan_name}...")
+        print(f"  Extracted: {stats['extracted']}/{stats['total']} ({stats['rate']:.1%})")
         low_bands = [
             f"{sz}px({info['rate']:.0%})"
             for sz, info in sorted(stats["per_band"].items())
@@ -159,26 +237,7 @@ def extract_all_scans(save_samples: bool = True) -> dict[str, dict]:
         ]
         if low_bands:
             print(f"  Low extraction: {', '.join(low_bands)}")
-
-        if save_samples:
-            for band in gt["bands"]:
-                cs = band["cell_size"]
-                band_crops = [
-                    c for c, idx in zip(result["crops"], result["dot_indices"])
-                    if gt["dots"][idx]["cell_size"] == cs
-                ]
-                band_labels = [
-                    l for l, idx in zip(result["labels"], result["dot_indices"])
-                    if gt["dots"][idx]["cell_size"] == cs
-                ]
-                if band_crops:
-                    montage_path = SAMPLES_DIR / f"{scan_name.replace('.png', '')}_{cs}px.png"
-                    _save_montage(band_crops, band_labels, cs, num_colors, montage_path)
-
-        results[scan_name] = {
-            "stats": stats,
-            "num_crops": len(result["crops"]),
-        }
+        results[scan_name] = {"stats": stats, "num_crops": num_crops}
 
     return results
 

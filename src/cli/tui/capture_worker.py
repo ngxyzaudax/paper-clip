@@ -4,7 +4,7 @@ from pathlib import Path
 from common.capture import run_capture_session
 from common.config import FLAG_ENCRYPTED, ALGO_FIELDS
 from common.config_store import load_profile
-from common.data_store import create_job, digital_dir, update_job_metadata
+from common.data_store import create_job, digital_dir, find_job, load_job_metadata, update_job_metadata
 from common.page_layout import data_capacity_bytes
 from serialization.encode.pipeline import encode
 
@@ -74,19 +74,37 @@ def run_full_capture(
     generate: bool,
     input_path: Path | None,
     generate_pages: int,
+    resume_prefix: str | None = None,
     on_status: Callable[[str], None] | None = None,
     on_prompt: Callable[[str], bool] | None = None,
 ) -> str:
-    if generate:
+    resume = (resume_prefix or "").strip()
+    if resume:
+        job_dir = find_job(resume)
+        if not job_dir:
+            raise ValueError(f"No job found matching: {resume}")
+        dpages = sorted((job_dir / "digital").glob("*.png"))
+        if not dpages:
+            raise ValueError("Job has no encoded pages in digital/")
+        meta = load_job_metadata(job_dir)
+        profile = str(meta.get("profile", profile))
+        on_status and on_status(f"Resuming job {job_dir.name} ({len(dpages)} page(s))")
+    elif generate:
         on_status and on_status("Generating test data...")
         job_dir, inp, sha = prepare_generate_job(profile, generate_pages, passphrase)
         on_status and on_status(f"Test: {sha[:24]}... Encoding...")
+        dpages = encode_job(inp, job_dir, profile, passphrase)
     else:
         inp = input_path
+        if inp is None:
+            raise ValueError("Input file required")
         job_dir = prepare_file_job(inp, profile)
         on_status and on_status("Encoding...")
-    dpages = encode_job(inp, job_dir, profile, passphrase)
-    on_status and on_status(f"Encoded {len(dpages)} page(s). Starting capture...")
+        dpages = encode_job(inp, job_dir, profile, passphrase)
+    if resume:
+        on_status and on_status(f"Starting capture for {len(dpages)} page(s)...")
+    else:
+        on_status and on_status(f"Encoded {len(dpages)} page(s). Starting capture...")
     masters = run_capture(
         job_dir, dpages, profile, printer, scanner_device,
         scanner_settings.get("dpi", 1200), scanner_settings.get("mode", "Color"),

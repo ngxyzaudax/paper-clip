@@ -1,10 +1,15 @@
 import json
+import os
 from collections import defaultdict
+from concurrent.futures import ProcessPoolExecutor
+from multiprocessing import get_context
 from pathlib import Path
 from typing import Any
 
 import cv2
 import numpy as np
+
+from pool_util import max_cpu_workers
 
 
 GROUND_TRUTH_PATH = Path(__file__).parent / "ground_truth.json"
@@ -14,6 +19,12 @@ METRICS_DIR = Path(__file__).parent / "output" / "metrics"
 DATASET_DIR = Path(__file__).parent / "output" / "dataset"
 
 FIXED_INPUT_SIZE = 32
+
+_mp_tf: Any = None
+_mp_models: dict[int, Any] = {}
+_mp_dots: list[dict] = []
+_mp_band_by_size: dict[int, list[int]] = {}
+_mp_cell_sizes: tuple[int, ...] = ()
 
 
 def _lazy_tf():
@@ -70,10 +81,63 @@ def _crop_and_predict(
     return batch_true, pred_classes.tolist()
 
 
+def _mp_eval_init(
+    model_dir_abs: str,
+    gt_abs: str,
+    cell_sizes_tuple: tuple[int, ...],
+) -> None:
+    global _mp_tf, _mp_models, _mp_dots, _mp_band_by_size, _mp_cell_sizes
+    cv2.setNumThreads(1)
+    intra = max(1, int(os.environ.get("CALIBRATION_TF_INTRA_THREADS", "2")))
+    os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+    tf = _lazy_tf()
+    tf.config.threading.set_intra_op_parallelism_threads(intra)
+    tf.config.threading.set_inter_op_parallelism_threads(1)
+    gt = json.loads(Path(gt_abs).read_text())
+    dots = gt["dots"]
+    bands = gt["bands"]
+    model_dir = Path(model_dir_abs)
+    models: dict[int, Any] = {}
+    for cs in cell_sizes_tuple:
+        models[cs] = tf.keras.models.load_model(str(model_dir / f"band_{cs}px.keras"))
+    band_by_size: dict[int, list[int]] = {}
+    for bi, b in enumerate(bands):
+        if b["cell_size"] in models:
+            band_by_size.setdefault(b["cell_size"], []).append(bi)
+    _mp_tf = tf
+    _mp_models = models
+    _mp_dots = dots
+    _mp_band_by_size = band_by_size
+    _mp_cell_sizes = cell_sizes_tuple
+
+
+def _mp_eval_one_scan(scan_abs: str) -> tuple[str, list[int], list[int], dict[int, tuple[list[int], list[int]]]]:
+    assert _mp_tf is not None
+    aligned = cv2.imread(scan_abs)
+    if aligned is None:
+        return Path(scan_abs).name, [], [], {}
+    scan_true: list[int] = []
+    scan_pred: list[int] = []
+    per_cs_chunks: dict[int, tuple[list[int], list[int]]] = {}
+    for cs in _mp_cell_sizes:
+        model = _mp_models[cs]
+        cs_true: list[int] = []
+        cs_pred: list[int] = []
+        for bi in _mp_band_by_size.get(cs, []):
+            true, pred = _crop_and_predict(_mp_tf, model, aligned, _mp_dots, bi, cs)
+            cs_true.extend(true)
+            cs_pred.extend(pred)
+        scan_true.extend(cs_true)
+        scan_pred.extend(cs_pred)
+        if cs_true:
+            per_cs_chunks[cs] = (cs_true, cs_pred)
+    return Path(scan_abs).name, scan_true, scan_pred, per_cs_chunks
+
+
 def evaluate_per_scan(
     cell_sizes: list[int] | None = None,
+    max_workers: int | None = None,
 ) -> dict:
-    tf = _lazy_tf()
     gt = _load_ground_truth()
     dots = gt["dots"]
     bands = gt["bands"]
@@ -85,16 +149,6 @@ def evaluate_per_scan(
             if (MODELS_DIR / f"band_{cs}px.keras").exists()
         )
 
-    models = {}
-    for cs in cell_sizes:
-        models[cs] = _load_model(tf, cs)
-        print(f"Loaded model for {cs}px")
-
-    band_by_size = {}
-    for bi, b in enumerate(bands):
-        if b["cell_size"] in models:
-            band_by_size.setdefault(b["cell_size"], []).append(bi)
-
     results: dict[str, Any] = {"per_scan": {}, "per_band": {}, "per_color": {}, "overall": {}}
 
     all_true: list[int] = []
@@ -102,38 +156,81 @@ def evaluate_per_scan(
     per_cs_true: dict[int, list[int]] = defaultdict(list)
     per_cs_pred: dict[int, list[int]] = defaultdict(list)
     scan_paths = sorted(ALIGNED_DIR.glob("scan*.png"))
+    if not scan_paths:
+        return results
 
-    for scan_path in scan_paths:
-        scan_name = scan_path.name
-        print(f"\nEvaluating {scan_name}...")
-        aligned = cv2.imread(str(scan_path))
-        if aligned is None:
-            continue
+    n_workers = max(1, max_workers if max_workers is not None else max_cpu_workers())
+    n_workers = min(n_workers, len(scan_paths))
 
-        scan_true: list[int] = []
-        scan_pred: list[int] = []
-
+    if n_workers <= 1:
+        tf = _lazy_tf()
+        models = {}
         for cs in cell_sizes:
-            model = models[cs]
-            for bi in band_by_size.get(cs, []):
-                true, pred = _crop_and_predict(tf, model, aligned, dots, bi, cs)
-                scan_true.extend(true)
-                scan_pred.extend(pred)
-                per_cs_true[cs].extend(true)
-                per_cs_pred[cs].extend(pred)
-
-        if scan_true:
-            correct = sum(t == p for t, p in zip(scan_true, scan_pred))
-            acc = correct / len(scan_true)
-            results["per_scan"][scan_name] = {
-                "accuracy": acc,
-                "total": len(scan_true),
-                "correct": correct,
-            }
-            print(f"  {scan_name}: {acc:.4f} ({correct}/{len(scan_true)})")
-
-        all_true.extend(scan_true)
-        all_pred.extend(scan_pred)
+            models[cs] = _load_model(tf, cs)
+            print(f"Loaded model for {cs}px")
+        band_by_size: dict[int, list[int]] = {}
+        for bi, b in enumerate(bands):
+            if b["cell_size"] in models:
+                band_by_size.setdefault(b["cell_size"], []).append(bi)
+        for scan_path in scan_paths:
+            scan_name = scan_path.name
+            print(f"\nEvaluating {scan_name}...")
+            aligned = cv2.imread(str(scan_path))
+            if aligned is None:
+                continue
+            scan_true: list[int] = []
+            scan_pred: list[int] = []
+            for cs in cell_sizes:
+                model = models[cs]
+                for bi in band_by_size.get(cs, []):
+                    true, pred = _crop_and_predict(tf, model, aligned, dots, bi, cs)
+                    scan_true.extend(true)
+                    scan_pred.extend(pred)
+                    per_cs_true[cs].extend(true)
+                    per_cs_pred[cs].extend(pred)
+            if scan_true:
+                correct = sum(t == p for t, p in zip(scan_true, scan_pred))
+                acc = correct / len(scan_true)
+                results["per_scan"][scan_name] = {
+                    "accuracy": acc,
+                    "total": len(scan_true),
+                    "correct": correct,
+                }
+                print(f"  {scan_name}: {acc:.4f} ({correct}/{len(scan_true)})")
+            all_true.extend(scan_true)
+            all_pred.extend(scan_pred)
+    else:
+        print(
+            f"Parallel evaluation: workers={n_workers} bands={list(cell_sizes)}",
+        )
+        ctx = get_context("spawn")
+        model_dir_abs = str(MODELS_DIR.resolve())
+        gt_abs = str(GROUND_TRUTH_PATH.resolve())
+        cs_tuple = tuple(cell_sizes)
+        with ProcessPoolExecutor(
+            max_workers=n_workers,
+            mp_context=ctx,
+            initializer=_mp_eval_init,
+            initargs=(model_dir_abs, gt_abs, cs_tuple),
+        ) as pool:
+            rows = list(pool.map(_mp_eval_one_scan, [str(p.resolve()) for p in scan_paths]))
+        rows.sort(key=lambda r: r[0])
+        for scan_name, scan_true, scan_pred, per_cs_chunks in rows:
+            print(f"\nEvaluating {scan_name}...")
+            if scan_true:
+                correct = sum(t == p for t, p in zip(scan_true, scan_pred))
+                acc = correct / len(scan_true)
+                results["per_scan"][scan_name] = {
+                    "accuracy": acc,
+                    "total": len(scan_true),
+                    "correct": correct,
+                }
+                print(f"  {scan_name}: {acc:.4f} ({correct}/{len(scan_true)})")
+            all_true.extend(scan_true)
+            all_pred.extend(scan_pred)
+            for cs, (t_chunk, p_chunk) in per_cs_chunks.items():
+                per_cs_true[cs].extend(t_chunk)
+                per_cs_pred[cs].extend(p_chunk)
 
     if all_true:
         overall_acc = sum(t == p for t, p in zip(all_true, all_pred)) / len(all_true)

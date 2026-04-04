@@ -249,9 +249,20 @@ def train_all_bands(
     num_classes = len(gt["colors"])
 
     if band_sizes is None:
-        band_sizes = sorted(set(b["cell_size"] for b in gt["bands"]))
+        band_sizes = sorted(
+            set(b["cell_size"] for b in gt["bands"]),
+            reverse=True,
+        )
+    else:
+        band_sizes = sorted(band_sizes, reverse=True)
 
-    results = {}
+    if band_sizes:
+        print(
+            f"Training {len(band_sizes)} bands sequentially (largest cell first): "
+            f"{band_sizes[0]}px down to {band_sizes[-1]}px",
+        )
+
+    results: dict = {}
     for cs in band_sizes:
         _, result = train_single_band(cs, num_classes, epochs=epochs)
         results[cs] = result

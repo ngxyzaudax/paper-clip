@@ -27,6 +27,8 @@ class CaptureScreen(Widget):
             yield Static("Guided Print + Scan Capture", classes="screen-title")
             with Vertical(classes="section"):
                 yield Static("Source", classes="section-title")
+                yield Label("Resume job ID prefix (optional)")
+                yield Input(placeholder="skip encode; use existing job digital pages", id="resume-job-input")
                 yield Checkbox("Generate random test data", id="chk-generate")
                 yield Label("Input File", id="lbl-input")
                 with Horizontal(classes="picker-row", id="row-input"):
@@ -74,6 +76,12 @@ class CaptureScreen(Widget):
         self.query_one("#input-pages", Input).display = gen
 
     def on_input_changed(self, event: Input.Changed) -> None:
+        if event.input.id == "resume-job-input":
+            r = event.value.strip()
+            self.query_one("#chk-generate", Checkbox).disabled = bool(r)
+            if r:
+                self.query_one("#chk-generate", Checkbox).value = False
+                self._set_generate_mode(False)
         self._check_ready()
 
     def on_select_changed(self, event: Select.Changed) -> None:
@@ -82,7 +90,10 @@ class CaptureScreen(Widget):
     def _check_ready(self) -> None:
         has_profile = self.query_one("#profile-select", Select).value != Select.BLANK
         has_printer = self.query_one("#printer-select", Select).value != Select.BLANK
-        if self.query_one("#chk-generate", Checkbox).value:
+        resume = self.query_one("#resume-job-input", Input).value.strip()
+        if resume:
+            ready = has_profile and has_printer
+        elif self.query_one("#chk-generate", Checkbox).value:
             ready = has_profile and has_printer
         else:
             ready = has_profile and has_printer and self._input_path is not None and self._input_path.is_file()
@@ -131,6 +142,7 @@ class CaptureScreen(Widget):
                 generate=self.query_one("#chk-generate", Checkbox).value,
                 input_path=self._input_path,
                 generate_pages=int(self.query_one("#input-pages", Input).value or "1"),
+                resume_prefix=self.query_one("#resume-job-input", Input).value.strip() or None,
                 on_status=on_s, on_prompt=self._blocking_prompt,
             )
         except Exception as e:

@@ -22,6 +22,8 @@ class EncodeScreen(Widget):
         self._paper_size: str = DEFAULT_PAPER_SIZE
         self._input_path: Path | None = None
         self._passphrase: str | None = None
+        self._save_pw_label_snapshot: str = ""
+        self._custom_output_snap: str = ""
 
     def compose(self) -> ComposeResult:
         profiles = list_profiles()
@@ -46,6 +48,10 @@ class EncodeScreen(Widget):
                     yield Button("Browse...", id="input-file-browse")
                 yield Label("Password (leave empty for no encryption)")
                 yield Input(placeholder="optional encryption password", password=True, id="password-input")
+                yield Label("Save password in keystore as (optional)")
+                yield Input(placeholder="label, only if password set", id="save-pw-label")
+                yield Label("Output path prefix (optional, default: new job under data/jobs/)")
+                yield Input(placeholder="e.g. /tmp/my_pages", id="custom-output-input")
             yield Static("", id="encoding-plan", classes="details-panel")
             with Horizontal(classes="button-bar"):
                 yield Button("Encode", variant="primary", id="btn-encode", disabled=True)
@@ -75,6 +81,8 @@ class EncodeScreen(Widget):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-encode":
+            self._save_pw_label_snapshot = self.query_one("#save-pw-label", Input).value.strip()
+            self._custom_output_snap = self.query_one("#custom-output-input", Input).value.strip()
             self.query_one("#btn-encode", Button).disabled = True
             self._run_encode()
         elif event.button.id == "input-file-browse":
@@ -116,12 +124,18 @@ class EncodeScreen(Widget):
             from common.config import FLAG_ENCRYPTED, ALGO_FIELDS
             from common.data_store import create_job, digital_dir
             config, input_path, passphrase = self._config, self._input_path, self._passphrase
+            save_lbl = self._save_pw_label_snapshot
+            custom_out = self._custom_output_snap
             flags = FLAG_ENCRYPTED if passphrase else 0
             file_size = input_path.stat().st_size
             total_pages = max(1, -(-file_size // data_capacity_bytes(config)))
             config_dict = {k: getattr(config, k) for k in ALGO_FIELDS}
-            job_dir = create_job(input_path.name, self._profile_name, config_dict, total_pages)
-            output_base = digital_dir(job_dir) / "page"
+            if custom_out:
+                output_base = Path(custom_out).expanduser()
+                job_dir = None
+            else:
+                job_dir = create_job(input_path.name, self._profile_name, config_dict, total_pages)
+                output_base = digital_dir(job_dir) / "page"
 
             def on_page(idx: int, total: int, path: Path | None) -> None:
                 self.app.call_from_thread(self._set_progress, ((idx + 1) / total) * 100, f"Page {idx+1}/{total}")
@@ -131,7 +145,14 @@ class EncodeScreen(Widget):
                 on_page_complete=on_page, flags=flags, passphrase=passphrase,
             )
             listing = "\n".join(str(p) for p in png_paths)
-            msg = f"[bold green]Complete - {len(png_paths)} page(s):\n{listing}\nJob: {job_dir}[/bold green]"
+            if job_dir is not None:
+                msg = f"[bold green]Complete - {len(png_paths)} page(s):\n{listing}\nJob: {job_dir}[/bold green]"
+            else:
+                msg = f"[bold green]Complete - {len(png_paths)} page(s):\n{listing}\nOutput: {output_base.parent}[/bold green]"
+            if save_lbl and passphrase:
+                from common.keystore import save_password as store_pw
+                store_pw(save_lbl, passphrase)
+                msg += f"\n[cyan]Password saved as '{save_lbl}'[/cyan]"
         except Exception as e:
             msg = f"[bold red]Error: {e}[/bold red]"
         self.app.call_from_thread(self._set_progress, 100, msg, True)
