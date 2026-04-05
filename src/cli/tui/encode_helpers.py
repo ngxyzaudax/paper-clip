@@ -1,6 +1,8 @@
+import logging
 from pathlib import Path
 
 from common.config import PaperClipConfig
+from common.perf import log_phase
 from common.page_layout import data_capacity_bytes, grid_dimensions, page_image_size, usable_area_px
 from common.palette import palette_from_config
 from common.symbols import bits_per_cell, symbol_count
@@ -40,6 +42,12 @@ def _format_palette_two_columns(palette: list[tuple[int, int, int]]) -> str:
 
 
 def format_encoding_info_panel(config: PaperClipConfig, paper_size: str) -> str:
+    logger = logging.getLogger(__name__)
+    with log_phase(logger, "tui.format_encoding_info_panel"):
+        return _format_encoding_info_panel_body(config, paper_size)
+
+
+def _format_encoding_info_panel_body(config: PaperClipConfig, paper_size: str) -> str:
     cols, rows = grid_dimensions(config)
     pw, ph = page_image_size(config)
     uw, uh = usable_area_px(config)
@@ -75,16 +83,18 @@ def format_encoding_plan(
     input_path: Path,
     passphrase: str | None = None,
 ) -> str:
-    from serialization.encode.encoder import prepare_payload
+    from serialization.encode.encoder import payload_byte_length_and_hash
 
     from common.page_layout import pages_needed
 
-    raw = input_path.read_bytes()
+    logger = logging.getLogger(__name__)
+    with log_phase(logger, "tui.encoding_plan.read_input"):
+        raw = input_path.read_bytes()
     sz = len(raw)
-    payload, _ = prepare_payload(
-        raw, config, filename=input_path.name, passphrase=passphrase,
-    )
-    plen = len(payload)
+    with log_phase(logger, "tui.encoding_plan.payload_byte_length"):
+        plen, _ = payload_byte_length_and_hash(
+            raw, config, filename=input_path.name, passphrase=passphrase,
+        )
     cap = data_capacity_bytes(config)
     data_pages = pages_needed(plen, config)
     total_pages = data_pages + config.redundancy_pages

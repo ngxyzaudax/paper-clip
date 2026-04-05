@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from functools import partial
 from pathlib import Path
 
@@ -21,6 +22,7 @@ from cli.tui.encoding_form import (
 )
 from cli.tui.encoding_settings_panel import EncodingSettingsPanel
 from cli.tui.encode_helpers import format_encoding_info_panel, format_encoding_plan
+from common.perf import log_phase
 from cli.tui.file_picker import FilePickerScreen
 from common.cell_size_picks import cell_size_pick_label
 from common.color_picker import symbol_option_label
@@ -161,15 +163,19 @@ class EncodeScreen(Widget):
         )
 
     def _rebuild_config(self) -> None:
+        logger = logging.getLogger(__name__)
         info = self.query_one("#encode-info-display", Static)
         try:
-            base = resolve_encoding_form(self._picks, self._read_text_inputs())
-            self._config = config_with_page_dimensions(base, self._picks.paper_size)
-            info.update(format_encoding_info_panel(self._config, self._picks.paper_size))
+            with log_phase(logger, "tui.EncodeScreen.resolve_form"):
+                base = resolve_encoding_form(self._picks, self._read_text_inputs())
+                self._config = config_with_page_dimensions(base, self._picks.paper_size)
+            with log_phase(logger, "tui.EncodeScreen.update_info_display"):
+                info.update(format_encoding_info_panel(self._config, self._picks.paper_size))
         except Exception as e:
             self._config = None
             info.update(f"[red]{e}[/red]")
-        self._update_plan()
+        with log_phase(logger, "tui.EncodeScreen.update_encoding_plan"):
+            self._update_plan()
 
     def _update_plan(self) -> None:
         plan = self.query_one("#encoding-plan", Static)

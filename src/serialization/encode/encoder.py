@@ -23,6 +23,38 @@ from common.symbols import bytes_to_symbols
 from common.types import SymbolGrid
 
 
+def payload_byte_length_and_hash(
+    raw: bytes,
+    config: PaperClipConfig,
+    filename: str = "",
+    passphrase: str | None = None,
+) -> tuple[int, bytes]:
+    sha256_hash = compute_sha256(raw)
+    compressed = compress(raw)
+    if passphrase:
+        from common.encryption import encrypt
+        compressed = encrypt(compressed, passphrase)
+    ecc_symbols = calculate_ecc_symbols(BLOCK_SIZE, config.rs_redundancy)
+    bs = effective_block_size(ecc_symbols)
+    blocks = _split_into_blocks(compressed, bs)
+    num_blocks = len(blocks)
+    if num_blocks > 0xFFFF:
+        raise ValueError(
+            f"Payload requires {num_blocks} blocks, exceeding the 65535 maximum. "
+            "Reduce input size or increase block capacity."
+        )
+    if not blocks:
+        interleaved_len = 0
+    else:
+        enc0 = rs_encode_block(blocks[0], ecc_symbols)
+        interleaved_len = num_blocks * len(enc0)
+    fname_bytes = filename.encode("utf-8")[:255]
+    payload_header = PAYLOAD_HEADER_STRUCT.pack(len(compressed), num_blocks, len(fname_bytes))
+    redundant_header = payload_header * PAYLOAD_HEADER_REDUNDANCY
+    total_len = len(redundant_header) + len(fname_bytes) + interleaved_len
+    return total_len, sha256_hash
+
+
 def prepare_payload(
     raw: bytes,
     config: PaperClipConfig,

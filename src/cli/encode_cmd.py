@@ -120,7 +120,7 @@ def encode_command(
 
     raw_data = input_file.read_bytes()
     file_size = len(raw_data)
-    payload, _ = prepare_payload(
+    payload, sha256_hash = prepare_payload(
         raw_data, config, filename=input_file.name, passphrase=password,
     )
     data_pages = pages_needed(len(payload), config)
@@ -148,6 +148,8 @@ def encode_command(
             input_file, output_base, config,
             on_page_complete=make_page_callback(progress, task),
             flags=flags, passphrase=password,
+            cached_payload_hash=(payload, sha256_hash),
+            source_file_size=file_size,
         )
 
     for p in png_paths:

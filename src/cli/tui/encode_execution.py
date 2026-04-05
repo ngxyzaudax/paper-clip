@@ -26,7 +26,8 @@ def run_tui_encode_job(
 ) -> tuple[str, list[Path]]:
     flags = FLAG_ENCRYPTED if passphrase else 0
     raw_data = input_path.read_bytes()
-    payload, _ = prepare_payload(
+    file_size = len(raw_data)
+    payload, sha256_hash = prepare_payload(
         raw_data, config, filename=input_path.name, passphrase=passphrase,
     )
     data_pages = pages_needed(len(payload), config)
@@ -44,5 +45,7 @@ def run_tui_encode_job(
     png_paths = encode(
         input_path, output_base, config,
         on_page_complete=on_page_complete, flags=flags, passphrase=passphrase,
+        cached_payload_hash=(payload, sha256_hash),
+        source_file_size=file_size,
     )
     return str(job_dir), png_paths

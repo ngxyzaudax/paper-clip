@@ -1,4 +1,5 @@
 import math
+from functools import lru_cache
 
 from common.config import PaperClipConfig
 from common.layout_metrics import layout_forbidden_rects, usable_area_px
@@ -14,6 +15,7 @@ def grid_dimensions(config: PaperClipConfig) -> tuple[int, int]:
     return cols, rows
 
 
+@lru_cache(maxsize=128)
 def data_capacity_symbols(config: PaperClipConfig) -> int:
     cols, rows = grid_dimensions(config)
     cell = config.cell_size_px
@@ -22,6 +24,7 @@ def data_capacity_symbols(config: PaperClipConfig) -> int:
     )
 
 
+@lru_cache(maxsize=32)
 def valid_cells_ordered(config: PaperClipConfig) -> list[tuple[int, int]]:
     cols, rows = grid_dimensions(config)
     cell = config.cell_size_px
