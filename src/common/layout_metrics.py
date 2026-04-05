@@ -1,5 +1,16 @@
-from common.config import FINDER_PATTERN_MODULES, PaperClipConfig, layout_clearance_px
-from common.layout_spatial import UsableLayout, build_usable_layout, forbidden_rects_usable
+from common.config import (
+    FIDUCIAL_DPI,
+    FINDER_PATTERN_MODULES,
+    PaperClipConfig,
+    layout_clearance_px,
+)
+from common.layout_spatial import (
+    UsableLayout,
+    build_usable_layout,
+    fiducial_px_to_print_px,
+    forbidden_rects_usable,
+    print_px_to_fiducial_px,
+)
 from common.types import Region
 
 
@@ -33,7 +44,11 @@ def layout_clearance_snapped(config: PaperClipConfig) -> int:
 
 
 def finder_pattern_size(config: PaperClipConfig) -> int:
-    return FINDER_PATTERN_MODULES * config.cell_size_px
+    c = config.cell_size_px
+    d = config.print_dpi
+    cell_f = max(1, print_px_to_fiducial_px(c, d, FIDUCIAL_DPI))
+    fp_f = FINDER_PATTERN_MODULES * cell_f
+    return fiducial_px_to_print_px(fp_f, d, FIDUCIAL_DPI)
 
 
 def strip_height_px(config: PaperClipConfig) -> int:
@@ -43,7 +58,12 @@ def strip_height_px(config: PaperClipConfig) -> int:
 def build_config_layout(config: PaperClipConfig) -> UsableLayout:
     uw, uh = usable_area_px(config)
     return build_usable_layout(
-        uw, uh, config.cell_size_px, finder_pattern_size(config), strip_height_px(config),
+        uw,
+        uh,
+        config.cell_size_px,
+        finder_pattern_size(config),
+        strip_height_px(config),
+        config.print_dpi,
     )
 
 

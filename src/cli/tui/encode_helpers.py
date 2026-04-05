@@ -12,27 +12,27 @@ def _format_rgb_display(r: int, g: int, b: int) -> str:
     return f"{r:>3},{g:>3},{b:>3}"
 
 
-def _palette_index_width(palette_len: int) -> int:
-    if palette_len <= 0:
+def _symbol_label_width(max_symbol: int) -> int:
+    if max_symbol <= 0:
         return 2
-    return max(2, len(str(palette_len - 1)))
+    return max(2, len(str(max_symbol)))
 
 
 def _palette_swatch_line(
-    index: int, rgb: tuple[int, int, int], idx_width: int,
+    symbol: int, rgb: tuple[int, int, int], label_width: int,
 ) -> str:
     r, g, b = rgb
-    idx_s = f"[{index:0{idx_width}d}]"
-    return f"{idx_s} [on rgb({r},{g},{b})]  [/on rgb({r},{g},{b})] {_format_rgb_display(r, g, b)}"
+    lab = f"[{symbol:0{label_width}d}]"
+    return f"{lab} [on rgb({r},{g},{b})]  [/on rgb({r},{g},{b})] {_format_rgb_display(r, g, b)}"
 
 
 def _format_palette_two_columns(palette: list[tuple[int, int, int]]) -> str:
-    w = _palette_index_width(len(palette))
+    w = _symbol_label_width(len(palette))
     lines: list[str] = []
     for i in range(0, len(palette), 2):
-        left = _palette_swatch_line(i, palette[i], w)
+        left = _palette_swatch_line(i + 1, palette[i], w)
         if i + 1 < len(palette):
-            right = _palette_swatch_line(i + 1, palette[i + 1], w)
+            right = _palette_swatch_line(i + 2, palette[i + 1], w)
             lines.append(f"  {left}  |  {right}")
         else:
             lines.append(f"  {left}")
@@ -48,13 +48,14 @@ def format_encoding_info_panel(config: PaperClipConfig, paper_size: str) -> str:
     capacity = data_capacity_bytes(config)
     if config.num_colors <= _PALETTE_PREVIEW_MAX_COLORS:
         palette = palette_from_config(config)
-        palette_lines = _format_palette_two_columns(palette)
+        palette_lines = "  0: blank\n" + _format_palette_two_columns(palette)
     else:
-        palette_lines = f"  ({config.num_colors} colors; preview omitted in TUI)"
+        palette_lines = f"  ({sc} symbols; preview omitted in TUI)"
     return (
         f"[bold cyan]Encoding Parameters[/bold cyan]\n"
-        f"  Colors: {config.num_colors}    Cell: {config.cell_size_px}px\n"
-        f"  Symbols: {sc}    Bits/cell: {bpc:.2f}    RS redundancy: {config.rs_redundancy:.0%}\n\n"
+        f"  Symbols: {sc} (0…{sc - 1})    Cell: {config.cell_size_px}px\n"
+        f"  Dot gain: {config.dot_gain_factor}    Dot guard: {config.dot_guard_band_px}px\n"
+        f"  Bits/cell: {bpc:.2f}    RS redundancy: {config.rs_redundancy:.0%}\n\n"
         f"[bold cyan]Hardware[/bold cyan]\n"
         f"  Print DPI: {config.print_dpi}    Margins mm T/R/B/L: "
         f"{config.margin_top_mm}/{config.margin_right_mm}/"
@@ -64,19 +65,34 @@ def format_encoding_info_panel(config: PaperClipConfig, paper_size: str) -> str:
         f"[bold cyan]Capacity[/bold cyan]\n"
         f"  Grid: {cols}x{rows} = {cols * rows:,} cells\n"
         f"  Capacity/page: [bold]{capacity:,}[/bold] bytes ({capacity / 1024:.1f} KB)\n\n"
-        f"[bold cyan]Color Palette[/bold cyan]\n"
+        f"[bold cyan]Symbol palette[/bold cyan]\n"
         f"{palette_lines}"
     )
 
 
 def format_encoding_plan(
-    config: PaperClipConfig, input_path: Path,
+    config: PaperClipConfig,
+    input_path: Path,
+    passphrase: str | None = None,
 ) -> str:
-    sz = input_path.stat().st_size
+    from serialization.encode.encoder import prepare_payload
+
+    from common.page_layout import pages_needed
+
+    raw = input_path.read_bytes()
+    sz = len(raw)
+    payload, _ = prepare_payload(
+        raw, config, filename=input_path.name, passphrase=passphrase,
+    )
+    plen = len(payload)
     cap = data_capacity_bytes(config)
-    pages = max(1, -(-sz // cap))
+    data_pages = pages_needed(plen, config)
+    total_pages = data_pages + config.redundancy_pages
+    util = (
+        min(100.0, plen / (cap * data_pages) * 100) if data_pages > 0 and cap > 0 else 0.0
+    )
     return (
-        f"[bold]Encoding Plan:[/bold]  {input_path.name} ({sz:,} B)\n"
-        f"Pages: {pages}  |  Utilization: {min(100.0, sz / (cap * pages) * 100):.1f}%  |  "
+        f"[bold]Encoding Plan:[/bold]  {input_path.name}  file {sz:,} B  payload {plen:,} B\n"
+        f"Data pages: {data_pages}  total {total_pages}  |  Utilization: {util:.1f}%  |  "
         f"Output: data/jobs/..."
     )

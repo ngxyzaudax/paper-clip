@@ -1,17 +1,9 @@
 import struct
 from dataclasses import dataclass
-from pathlib import Path
-
-try:
-    import tomllib
-except ImportError:
-    import tomli as tomllib
-
-import tomli_w
 
 
 MAGIC = b"PCLP"
-FORMAT_VERSION = 8
+FORMAT_VERSION = 9
 MARGIN_MM = 3.0
 
 BLOCK_SIZE = 200
@@ -21,9 +13,14 @@ DOWNSCALE_MAX_DIM = 4000
 APRILTAG_FAMILY = "tag36h11"
 
 DOT_GAIN_FACTOR = 1.8
+MIN_DOT_GAIN_FACTOR = 1.05
+MAX_DOT_GAIN_FACTOR = 3.0
 GUARD_BAND_PX = 1
 MIN_CELL_SIZE_PX = 5
 LAYOUT_CLEARANCE_DIVISOR = 200
+FIDUCIAL_DPI = 300
+APRILTAG_MESH_N = 32
+APRILTAG_36H11_ID_COUNT = 587
 
 QR_MODULE_PX = 12
 QR_BORDER_MODULES = 2
@@ -57,6 +54,8 @@ class PaperClipConfig:
     print_dpi: int = 1200
     rs_redundancy: float = 0.20
     redundancy_pages: int = 0
+    dot_gain_factor: float = DOT_GAIN_FACTOR
+    dot_guard_band_px: int = GUARD_BAND_PX
     page_width_mm: float = 210.0
     page_height_mm: float = 297.0
     margin_top_mm: float = MARGIN_MM
@@ -66,8 +65,9 @@ class PaperClipConfig:
 
 
 def validate_config(config: PaperClipConfig) -> PaperClipConfig:
-    if config.num_colors < 2:
-        raise ValueError("num_colors must be at least 2")
+    from common.color_picker import validate_print_ink_count
+
+    validate_print_ink_count(config.num_colors)
     if config.cell_size_px < MIN_CELL_SIZE_PX:
         raise ValueError(f"cell_size_px must be at least {MIN_CELL_SIZE_PX}")
     if config.print_dpi < 300:
@@ -76,6 +76,14 @@ def validate_config(config: PaperClipConfig) -> PaperClipConfig:
         raise ValueError("rs_redundancy must be between 0.05 and 0.50")
     if config.redundancy_pages < 0:
         raise ValueError("redundancy_pages must be non-negative")
+    if config.dot_gain_factor < MIN_DOT_GAIN_FACTOR or config.dot_gain_factor > MAX_DOT_GAIN_FACTOR:
+        raise ValueError(
+            f"dot_gain_factor must be between {MIN_DOT_GAIN_FACTOR} and {MAX_DOT_GAIN_FACTOR}",
+        )
+    if config.dot_guard_band_px < 0:
+        raise ValueError("dot_guard_band_px must be non-negative")
+    if config.cell_size_px <= 2 * config.dot_guard_band_px + 3:
+        raise ValueError("dot_guard_band_px is too large for cell_size_px")
     if config.page_width_mm <= 0 or config.page_height_mm <= 0:
         raise ValueError("page dimensions must be positive")
     for name in (
@@ -93,28 +101,15 @@ def validate_config(config: PaperClipConfig) -> PaperClipConfig:
     return config
 
 
-ALGO_FIELDS = ("num_colors", "cell_size_px", "print_dpi", "rs_redundancy", "redundancy_pages")
-
-
-def save_config(config: PaperClipConfig, path: Path) -> None:
-    data = {"paper_clip": {k: getattr(config, k) for k in ALGO_FIELDS}}
-    path.write_bytes(tomli_w.dumps(data).encode())
-
-
-def load_config(path: Path) -> PaperClipConfig:
-    raw = tomllib.loads(path.read_text())
-    section = dict(raw.get("paper_clip", {}))
-    if "print_dpi" not in section and "scan_dpi" in section:
-        section["print_dpi"] = section["scan_dpi"]
-    if "margin_mm" in section and "margin_top_mm" not in section:
-        m = section.pop("margin_mm")
-        section["margin_top_mm"] = m
-        section["margin_right_mm"] = m
-        section["margin_bottom_mm"] = m
-        section["margin_left_mm"] = m
-    valid_fields = {f.name for f in __import__("dataclasses").fields(PaperClipConfig)}
-    filtered = {k: v for k, v in section.items() if k in valid_fields}
-    return validate_config(PaperClipConfig(**filtered))
+ALGO_FIELDS = (
+    "num_colors",
+    "cell_size_px",
+    "print_dpi",
+    "rs_redundancy",
+    "redundancy_pages",
+    "dot_gain_factor",
+    "dot_guard_band_px",
+)
 
 
 def default_config() -> PaperClipConfig:
@@ -122,13 +117,15 @@ def default_config() -> PaperClipConfig:
 
 
 def resolve_config(
-    config_file: Path | None = None,
     num_colors: int | None = None,
+    num_symbols: int | None = None,
     cell_size_px: int | None = None,
     paper_size: str | None = None,
     print_dpi: int | None = None,
     rs_redundancy: float | None = None,
     redundancy_pages: int | None = None,
+    dot_gain_factor: float | None = None,
+    dot_guard_band_px: int | None = None,
     margin_mm: float | None = None,
     margin_top_mm: float | None = None,
     margin_right_mm: float | None = None,
@@ -137,7 +134,15 @@ def resolve_config(
 ) -> PaperClipConfig:
     from dataclasses import replace
 
-    base = load_config(config_file) if config_file else default_config()
+    if num_colors is not None and num_symbols is not None:
+        raise ValueError("pass only one of num_colors and num_symbols")
+    if num_symbols is not None:
+        from common.color_picker import validate_print_symbol_count
+
+        validate_print_symbol_count(num_symbols)
+        num_colors = num_symbols - 1
+
+    base = default_config()
     overrides: dict[str, object] = {
         k: v
         for k, v in [
@@ -146,6 +151,8 @@ def resolve_config(
             ("print_dpi", print_dpi),
             ("rs_redundancy", rs_redundancy),
             ("redundancy_pages", redundancy_pages),
+            ("dot_gain_factor", dot_gain_factor),
+            ("dot_guard_band_px", dot_guard_band_px),
         ]
         if v is not None
     }

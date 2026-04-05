@@ -45,3 +45,10 @@ def paper_size_options() -> list[tuple[str, str]]:
         (f"{name} ({w:.0f} x {h:.0f} mm)", name)
         for name, (w, h) in PAPER_SIZES.items()
     ]
+
+
+def paper_size_option_label(value: str) -> str:
+    for label, name in paper_size_options():
+        if name == value:
+            return label
+    return value

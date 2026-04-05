@@ -27,13 +27,13 @@ def render_pages(
     raw_data = input_path.read_bytes()
     file_size = len(raw_data)
     logger.info("Read %d bytes from %s", file_size, input_path)
-    data_pages = compute_total_pages(file_size, config)
-    total_pages = data_pages + config.redundancy_pages
-    logger.info("Rendering %d data + %d parity = %d page(s)",
-                data_pages, config.redundancy_pages, total_pages)
     payload, sha256_hash = prepare_payload(
         raw_data, config, filename=input_path.name, passphrase=passphrase,
     )
+    data_pages = compute_total_pages(len(payload), config)
+    total_pages = data_pages + config.redundancy_pages
+    logger.info("Rendering %d data + %d parity = %d page(s)",
+                data_pages, config.redundancy_pages, total_pages)
     grids = payload_to_symbol_grids(payload, config, data_pages)
 
     images: list[Image.Image] = []

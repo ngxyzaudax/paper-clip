@@ -2,6 +2,8 @@ import cv2
 from PIL import Image
 
 APRILTAG_FAMILY = "tag36h11"
+
+_render_cache: dict[tuple[int, int], Image.Image] = {}
 APRILTAG_CV2_DICT = cv2.aruco.DICT_APRILTAG_36h11
 
 TL_TAG_ID = 0
@@ -25,5 +27,11 @@ def _aruco_dict() -> cv2.aruco.Dictionary:
 
 
 def render_apriltag(tag_id: int, size_px: int) -> Image.Image:
+    k = (tag_id, size_px)
+    hit = _render_cache.get(k)
+    if hit is not None:
+        return hit
     marker = cv2.aruco.generateImageMarker(_aruco_dict(), tag_id, size_px)
-    return Image.fromarray(marker).convert("RGB")
+    img = Image.fromarray(marker).convert("RGB")
+    _render_cache[k] = img
+    return img

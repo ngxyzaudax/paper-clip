@@ -20,10 +20,10 @@ def render_page(
 ) -> Image.Image:
     width, height = page_image_size(config)
     image = Image.new("RGB", (width, height), (255, 255, 255))
-    image = draw_apriltag_layer(image, config)
     header_bytes = encode_header_bytes(
         config, page_index, total_pages, data_pages, data_hash, data_length, flags
     )
     image = render_qr_header(header_bytes, image, config)
     image = render_data_grid(grid, image, config)
+    image = draw_apriltag_layer(image, config)
     return image

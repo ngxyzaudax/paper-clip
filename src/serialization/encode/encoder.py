@@ -5,6 +5,7 @@ from common.codec import (
     rs_encode_block,
 )
 from common.compression import compress
+
 from common.config import (
     BLOCK_SIZE,
     PAYLOAD_HEADER_REDUNDANCY,
@@ -83,5 +84,5 @@ def payload_to_symbol_grids(
     return grids
 
 
-def compute_total_pages(raw_size: int, config: PaperClipConfig) -> int:
-    return pages_needed(raw_size, config)
+def compute_total_pages(payload_byte_length: int, config: PaperClipConfig) -> int:
+    return pages_needed(payload_byte_length, config)
