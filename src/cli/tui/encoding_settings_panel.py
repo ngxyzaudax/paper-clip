@@ -3,22 +3,24 @@ from __future__ import annotations
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widget import Widget
-from textual.widgets import Button, Input, Label, Static
+from textual.widgets import Button, Label, Static
 
-from cli.tui.encoding_form import EncodingFormPicks, EncodingFormTextInputs
+from cli.tui.encoding_form import EncodingFormPicks
 from common.cell_size_picks import cell_size_pick_label
 from common.color_picker import symbol_option_label
 from common.dot_print_picks import dot_gain_pick_label, dot_guard_pick_label
 from common.paper_sizes import paper_size_option_label
 from common.print_dpi_presets import print_dpi_option_label
+from common.parity_pages_picks import parity_pages_option_label
+from common.margin_mm_picks import margin_mm_option_label
+from common.rs_redundancy_picks import rs_redundancy_option_label
 
 
 class EncodingSettingsPanel(Widget):
 
-    def __init__(self, picks: EncodingFormPicks, text_defaults: EncodingFormTextInputs) -> None:
+    def __init__(self, picks: EncodingFormPicks) -> None:
         super().__init__()
         self._picks = picks
-        self._tx = text_defaults
 
     def compose(self) -> ComposeResult:
         yield Static("Encoding settings", classes="encode-panel-title")
@@ -49,11 +51,19 @@ class EncodingSettingsPanel(Widget):
                         )
                     with Vertical(classes="form-col"):
                         yield Label("RS redundancy")
-                        yield Input(value=self._tx.rs_redundancy, id="enc-rs", compact=True)
+                        yield Button(
+                            rs_redundancy_option_label(self._picks.rs_redundancy),
+                            id="enc-rs-pick",
+                            compact=True,
+                        )
                 with Horizontal(classes="form-row"):
                     with Vertical(classes="form-col"):
                         yield Label("Parity pages")
-                        yield Input(value=self._tx.redundancy_pages, id="enc-red-pages", compact=True)
+                        yield Button(
+                            parity_pages_option_label(self._picks.redundancy_pages),
+                            id="enc-parity-pick",
+                            compact=True,
+                        )
                 with Horizontal(classes="form-row"):
                     with Vertical(classes="form-col"):
                         yield Label("Dot gain")
@@ -70,21 +80,13 @@ class EncodingSettingsPanel(Widget):
                             compact=True,
                         )
                 with Horizontal(classes="form-row"):
-                    yield Label("Margins mm")
-                with Horizontal(classes="form-row"):
                     with Vertical(classes="form-col"):
-                        yield Label("Top")
-                        yield Input(value=self._tx.margin_top_mm, id="enc-margin-t", compact=True)
-                    with Vertical(classes="form-col"):
-                        yield Label("Right")
-                        yield Input(value=self._tx.margin_right_mm, id="enc-margin-r", compact=True)
-                    with Vertical(classes="form-col"):
-                        yield Label("Bottom")
-                        yield Input(value=self._tx.margin_bottom_mm, id="enc-margin-b", compact=True)
-                    with Vertical(classes="form-col"):
-                        yield Label("Left")
-                        yield Input(value=self._tx.margin_left_mm, id="enc-margin-l", compact=True)
-                with Horizontal(classes="form-row"):
+                        yield Label("Margins")
+                        yield Button(
+                            margin_mm_option_label(self._picks.margin_mm),
+                            id="enc-margin-pick",
+                            compact=True,
+                        )
                     with Vertical(classes="form-col"):
                         yield Label("Paper size")
                         yield Button(

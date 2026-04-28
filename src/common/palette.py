@@ -10,9 +10,9 @@ def dot_fill_fraction(dot_gain_factor: float) -> float:
 BLANK_RGB: RGB = (255, 255, 255)
 
 
-def generate_palette(num_colors: int) -> list[RGB]:
-    return ordered_print_palette(num_colors)
+def generate_palette(num_ink_colors: int) -> list[RGB]:
+    return ordered_print_palette(num_ink_colors)
 
 
 def palette_from_config(config: PaperClipConfig) -> list[RGB]:
-    return generate_palette(config.num_colors)
+    return generate_palette(config.num_symbols - 1)

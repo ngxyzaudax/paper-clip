@@ -35,3 +35,20 @@ def interleave_blocks(blocks: list[bytes]) -> bytes:
                 result[idx] = block[col]
                 idx += 1
     return bytes(result)
+
+
+def rs_encoded_stream_data_vs_parity(
+    total_encoded_bytes: int,
+    block_size: int,
+    redundancy: float,
+) -> tuple[int, int]:
+    if total_encoded_bytes <= 0:
+        return 0, 0
+    ecc = calculate_ecc_symbols(block_size, redundancy)
+    bs = effective_block_size(ecc)
+    denom = bs + ecc
+    if denom <= 0:
+        return 0, total_encoded_bytes
+    data_bytes = (total_encoded_bytes * bs) // denom
+    parity_bytes = total_encoded_bytes - data_bytes
+    return data_bytes, parity_bytes

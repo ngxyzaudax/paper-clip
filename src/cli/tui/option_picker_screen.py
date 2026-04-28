@@ -21,7 +21,7 @@ class OptionPickerScreen(ModalScreen[Any | None]):
         padding: 1 2;
     }
     OptionPickerScreen #option-picker-title {
-        text-align: center;
+        text-align: left !important;
         margin-bottom: 1;
     }
     OptionPickerScreen #option-picker-scroll {
@@ -31,7 +31,6 @@ class OptionPickerScreen(ModalScreen[Any | None]):
     OptionPickerScreen .option-picker-choice {
         width: 100%;
         min-height: 1;
-        content-align: left middle;
     }
     OptionPickerScreen #option-picker-cancel {
         margin-top: 1;

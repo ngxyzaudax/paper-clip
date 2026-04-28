@@ -18,7 +18,7 @@ from common.data_store import create_job, digital_dir
 from common.page_layout import data_capacity_bytes, grid_dimensions, page_image_size, pages_needed
 from common.palette import palette_from_config
 from common.paper_sizes import detect_paper_size
-from common.symbols import bits_per_cell, symbol_count
+from common.symbols import bits_per_cell
 from serialization.encode.pipeline import encode
 
 console = Console()
@@ -34,8 +34,8 @@ def _show_encoding_plan(
     capacity = data_capacity_bytes(config)
     cols, rows = grid_dimensions(config)
     pw, ph = page_image_size(config)
-    bpc = bits_per_cell(config.num_colors)
-    sc = symbol_count(config.num_colors)
+    bpc = bits_per_cell(config.num_symbols)
+    sc = config.num_symbols
     data_pages = pages_needed(payload_size, config)
     pages = data_pages + config.redundancy_pages
     palette = palette_from_config(config)
@@ -52,7 +52,9 @@ def _show_encoding_plan(
         ("Dot guard px", str(config.dot_guard_band_px)),
     ], title="Encoding Configuration")
     console.print("\n[bold]Symbol palette:[/bold]")
-    console.print("  0: (blank paper, no dot)")
+    r0, g0, b0 = 255, 255, 255
+    block0 = f"[on rgb({r0},{g0},{b0})]      [/on rgb({r0},{g0},{b0})]"
+    console.print(f"  0: {block0}  RGB({r0}, {g0}, {b0})  (blank paper, no dot)")
     for sym, (r, g, b) in enumerate(palette, start=1):
         block = f"[on rgb({r},{g},{b})]      [/on rgb({r},{g},{b})]"
         console.print(f"  {sym}: {block}  RGB({r}, {g}, {b})")
@@ -79,7 +81,11 @@ def encode_command(
     num_symbols: int | None = typer.Option(
         None,
         "--num-symbols",
-        help="Per-cell alphabet size (symbols 0…N-1; 0 blank, 1… CMYK print-mix order)",
+        help=(
+            "Per-cell alphabet size (symbols 0…N-1; 0 blank). "
+            "Inks follow tiered CMYK mixes (primaries, 2-ink, K-tints, 3-ink), "
+            "deduplicated for scan contrast at default dot size."
+        ),
     ),
     cell_size_px: int | None = typer.Option(None, help="Cell size in pixels"),
     paper_size: str | None = typer.Option(None, help="Paper size (A3, A4, A5, Letter, Legal, etc.)"),
@@ -99,7 +105,10 @@ def encode_command(
         None,
         help="Inner padding around each dot in pixels (0 = tightest)",
     ),
-    password: str | None = typer.Option(None, help="Encrypt with this password"),
+    password: str | None = typer.Option(
+        None,
+        help="Passphrase for payload encryption (built-in default key when omitted)",
+    ),
 ) -> None:
     """Encode a file into print-ready PNG page(s). Saves into data/jobs/ by default."""
     if not input_file.exists():
@@ -112,9 +121,6 @@ def encode_command(
         margin_top_mm, margin_right_mm, margin_bottom_mm, margin_left_mm,
         dot_gain_factor, dot_guard_band_px,
     )
-    from common.config import FLAG_ENCRYPTED
-
-    flags = FLAG_ENCRYPTED if password else 0
 
     from serialization.encode.encoder import prepare_payload
 
@@ -139,7 +145,7 @@ def encode_command(
 
     _show_encoding_plan(input_file, output_base.parent, config, file_size, len(payload))
     if password:
-        console.print("[bold yellow]Encryption enabled[/bold yellow]")
+        console.print("[bold yellow]User passphrase in use[/bold yellow]")
     console.print()
 
     progress, task = make_page_progress("Rendering pages")
@@ -147,9 +153,8 @@ def encode_command(
         png_paths = encode(
             input_file, output_base, config,
             on_page_complete=make_page_callback(progress, task),
-            flags=flags, passphrase=password,
+            passphrase=password,
             cached_payload_hash=(payload, sha256_hash),
-            source_file_size=file_size,
         )
 
     for p in png_paths:

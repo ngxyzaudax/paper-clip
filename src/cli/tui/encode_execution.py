@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Callable
 
-from common.config import ALGO_FIELDS, PaperClipConfig, FLAG_ENCRYPTED
+from common.config import ALGO_FIELDS, PaperClipConfig
 from common.data_store import create_job, digital_dir
 from common.page_layout import pages_needed
 from serialization.encode.encoder import prepare_payload
@@ -24,9 +24,7 @@ def run_tui_encode_job(
     passphrase: str | None,
     on_page_complete: Callable[[int, int, Path | None], None],
 ) -> tuple[str, list[Path]]:
-    flags = FLAG_ENCRYPTED if passphrase else 0
     raw_data = input_path.read_bytes()
-    file_size = len(raw_data)
     payload, sha256_hash = prepare_payload(
         raw_data, config, filename=input_path.name, passphrase=passphrase,
     )
@@ -44,8 +42,7 @@ def run_tui_encode_job(
     output_base = digital_dir(job_dir) / "page"
     png_paths = encode(
         input_path, output_base, config,
-        on_page_complete=on_page_complete, flags=flags, passphrase=passphrase,
+        on_page_complete=on_page_complete, passphrase=passphrase,
         cached_payload_hash=(payload, sha256_hash),
-        source_file_size=file_size,
     )
     return str(job_dir), png_paths

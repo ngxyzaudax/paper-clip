@@ -2,21 +2,12 @@ import math
 from functools import lru_cache
 
 
-def symbol_count(num_colors: int) -> int:
-    return num_colors + 1
-
-
-def bits_per_cell(num_colors: int) -> float:
-    return math.log2(symbol_count(num_colors))
+def bits_per_cell(num_symbols: int) -> float:
+    return math.log2(num_symbols)
 
 
 @lru_cache(maxsize=32)
 def chunk_params(n: int) -> tuple[int, int]:
-    """Find optimal (chunk_bytes, chunk_symbols) for base-n encoding.
-
-    Returns the pair where 256^chunk_bytes <= n^chunk_symbols and the bit
-    efficiency (chunk_bytes * 8) / (chunk_symbols * log2(n)) is maximized.
-    """
     best_eff = 0.0
     log2_n = math.log2(n)
     best = (1, math.ceil(8 / log2_n))
@@ -39,8 +30,8 @@ def color_index_to_symbol(color_index: int) -> int:
     return color_index + 1
 
 
-def bytes_to_symbols(data: bytes, num_colors: int) -> list[int]:
-    n = symbol_count(num_colors)
+def bytes_to_symbols(data: bytes, num_symbols: int) -> list[int]:
+    n = num_symbols
     k, m = chunk_params(n)
     symbols: list[int] = []
     for i in range(0, len(data), k):
@@ -56,8 +47,8 @@ def bytes_to_symbols(data: bytes, num_colors: int) -> list[int]:
     return symbols
 
 
-def symbols_to_bytes(symbols: list[int], num_colors: int, expected_byte_count: int) -> bytes:
-    n = symbol_count(num_colors)
+def symbols_to_bytes(symbols: list[int], num_symbols: int, expected_byte_count: int) -> bytes:
+    n = num_symbols
     k, m = chunk_params(n)
     max_value = 256 ** k
     result = bytearray()

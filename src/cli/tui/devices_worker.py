@@ -1,11 +1,53 @@
 from common.device_config import get_printer_settings, get_scanner_settings
 from common.types import PrinterInfo, ScannerInfo
-from textual.widgets import Select
+
+
+def printer_section_placeholder(
+    options: list[tuple[str, str]],
+    selected: str | None,
+) -> str | None:
+    if not options:
+        return "[yellow]No printers found.[/yellow]"
+    if not selected:
+        return (
+            "[dim]Choose a printer on the left to see resolutions, paper sizes, "
+            "color modes, and duplex options.[/dim]"
+        )
+    return None
+
+
+def scanner_section_placeholder(
+    options: list[tuple[str, str]],
+    selected: str | None,
+) -> str | None:
+    if not options:
+        return "[yellow]No scanners found.[/yellow]"
+    if not selected:
+        return (
+            "[dim]Choose a scanner on the left to see DPI, modes, and sources.[/dim]"
+        )
+    return None
+
+
+def pick_button_label(
+    options: list[tuple[str, str]],
+    value: str | None,
+    *,
+    absent_message: str,
+) -> str:
+    if not options:
+        return absent_message
+    if not value:
+        return "[dim]Select…[/dim]"
+    for lab, v in options:
+        if v == value:
+            return lab
+    return value
 
 
 def discover_printers(
     printers_out: list[PrinterInfo],
-) -> tuple[list[tuple[str, str]], "str | type"]:
+) -> tuple[list[tuple[str, str]], str | None]:
     from common.cups_client import list_printers
     printers_out.clear()
     printers_out.extend(list_printers())
@@ -15,13 +57,13 @@ def discover_printers(
         for p in printers_out
     ]
     saved_name = saved.get("name", "")
-    initial = saved_name if any(p.name == saved_name for p in printers_out) else Select.BLANK
+    initial = saved_name if any(p.name == saved_name for p in printers_out) else None
     return options, initial
 
 
 def discover_scanners(
     scanners_out: list[ScannerInfo],
-) -> tuple[list[tuple[str, str]], "str | type"]:
+) -> tuple[list[tuple[str, str]], str | None]:
     from common.sane_client import list_scanners
     scanners_out.clear()
     scanners_out.extend(list_scanners())
@@ -31,7 +73,7 @@ def discover_scanners(
         for s in scanners_out
     ]
     saved_device = saved.get("device", "")
-    initial = saved_device if any(s.device_id == saved_device for s in scanners_out) else Select.BLANK
+    initial = saved_device if any(s.device_id == saved_device for s in scanners_out) else None
     return options, initial
 
 

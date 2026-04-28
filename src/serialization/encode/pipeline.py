@@ -3,7 +3,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from common.config import FLAG_ENCRYPTED, PaperClipConfig
+from common.config import PaperClipConfig
 from common.perf import log_phase
 from serialization.encode.encoder import (
     compute_total_pages,
@@ -20,24 +20,16 @@ def render_pages(
     input_path: Path,
     config: PaperClipConfig,
     on_page_complete: OnPageComplete | None = None,
-    flags: int = 0,
     passphrase: str | None = None,
     cached_payload_hash: tuple[bytes, bytes] | None = None,
-    source_file_size: int | None = None,
 ) -> list[Image.Image]:
-    if passphrase:
-        flags |= FLAG_ENCRYPTED
     if cached_payload_hash is not None:
-        if source_file_size is None:
-            raise ValueError("source_file_size is required when cached_payload_hash is set")
         payload, sha256_hash = cached_payload_hash
-        file_size = source_file_size
         logger.debug("render_pages using cached payload; skipped read and prepare_payload")
     else:
         with log_phase(logger, "render_pages.read_input"):
             raw_data = input_path.read_bytes()
-            file_size = len(raw_data)
-        logger.info("Read %d bytes from %s", file_size, input_path)
+        logger.info("Read %d bytes from %s", len(raw_data), input_path)
         with log_phase(logger, "render_pages.prepare_payload"):
             payload, sha256_hash = prepare_payload(
                 raw_data, config, filename=input_path.name, passphrase=passphrase,
@@ -54,7 +46,7 @@ def render_pages(
         for page_idx, grid in enumerate(grids):
             image = render_page(
                 grid, page_idx, total_pages, data_pages,
-                sha256_hash, file_size, config, flags,
+                sha256_hash, config,
             )
             images.append(image)
             if on_page_complete:
@@ -64,7 +56,7 @@ def render_pages(
         with log_phase(logger, "render_pages.render_parity_pages"):
             images.extend(render_parity_pages(
                 payload, config, data_pages, total_pages,
-                sha256_hash, file_size, flags, on_page_complete,
+                sha256_hash, on_page_complete,
             ))
     return images
 
@@ -80,15 +72,12 @@ def encode(
     output_base: Path,
     config: PaperClipConfig,
     on_page_complete: OnPageComplete | None = None,
-    flags: int = 0,
     passphrase: str | None = None,
     cached_payload_hash: tuple[bytes, bytes] | None = None,
-    source_file_size: int | None = None,
 ) -> list[Path]:
     images = render_pages(
-        input_path, config, on_page_complete, flags, passphrase,
+        input_path, config, on_page_complete, passphrase,
         cached_payload_hash=cached_payload_hash,
-        source_file_size=source_file_size,
     )
     output_base.parent.mkdir(parents=True, exist_ok=True)
     paths = _output_paths(output_base, len(images))

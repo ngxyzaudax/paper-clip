@@ -15,9 +15,7 @@ from cli.tui.encode_execution import format_encode_success_message, run_tui_enco
 from cli.tui.encode_pickers import encode_option_picker
 from cli.tui.encoding_form import (
     EncodingFormPicks,
-    EncodingFormTextInputs,
     default_encoding_form_picks,
-    default_encoding_form_text_inputs,
     resolve_encoding_form,
 )
 from cli.tui.encoding_settings_panel import EncodingSettingsPanel
@@ -30,6 +28,9 @@ from common.config import PaperClipConfig
 from common.dot_print_picks import dot_gain_pick_label, dot_guard_pick_label
 from common.paper_sizes import config_with_page_dimensions, paper_size_option_label
 from common.print_dpi_presets import print_dpi_option_label
+from common.margin_mm_picks import margin_mm_option_label
+from common.parity_pages_picks import parity_pages_option_label
+from common.rs_redundancy_picks import rs_redundancy_option_label
 
 
 class EncodeScreen(Widget):
@@ -43,11 +44,10 @@ class EncodeScreen(Widget):
         self._rebuild_timer: Timer | None = None
 
     def compose(self) -> ComposeResult:
-        tx = default_encoding_form_text_inputs()
         with Vertical(classes="encode-screen-layout form-container"):
             with Horizontal(classes="encode-split"):
                 with Vertical(classes="encode-form-col"):
-                    yield EncodingSettingsPanel(self._picks, tx)
+                    yield EncodingSettingsPanel(self._picks)
                 with Vertical(classes="encode-info-col"):
                     yield Static("Encoding info", classes="encode-panel-title")
                     with Vertical(classes="section"):
@@ -62,7 +62,7 @@ class EncodeScreen(Widget):
                     with Vertical(classes="encode-password-block"):
                         yield Label("Password")
                         yield Input(
-                            placeholder="optional; encrypts payload",
+                            placeholder="optional; replaces default encryption key",
                             password=True,
                             id="password-input",
                             compact=True,
@@ -126,12 +126,18 @@ class EncodeScreen(Widget):
                 self._picks.symbol_count = int(result)
             case "enc-dpi-pick":
                 self._picks.print_dpi = int(result)
+            case "enc-rs-pick":
+                self._picks.rs_redundancy = float(result)
+            case "enc-parity-pick":
+                self._picks.redundancy_pages = int(result)
             case "enc-paper-pick":
                 self._picks.paper_size = str(result)
             case "enc-dot-gain-pick":
                 self._picks.dot_gain_factor = float(result)
             case "enc-dot-guard-pick":
                 self._picks.dot_guard_band_px = int(result)
+            case "enc-margin-pick":
+                self._picks.margin_mm = float(result)
             case _:
                 return
         self._refresh_pick_button_labels()
@@ -141,9 +147,14 @@ class EncodeScreen(Widget):
         self.query_one("#enc-symbols-pick", Button).label = symbol_option_label(self._picks.symbol_count)
         self.query_one("#enc-cell-pick", Button).label = cell_size_pick_label(self._picks.cell_size_px)
         self.query_one("#enc-dpi-pick", Button).label = print_dpi_option_label(self._picks.print_dpi)
+        self.query_one("#enc-rs-pick", Button).label = rs_redundancy_option_label(self._picks.rs_redundancy)
+        self.query_one("#enc-parity-pick", Button).label = parity_pages_option_label(
+            self._picks.redundancy_pages,
+        )
         self.query_one("#enc-paper-pick", Button).label = paper_size_option_label(self._picks.paper_size)
         self.query_one("#enc-dot-gain-pick", Button).label = dot_gain_pick_label(self._picks.dot_gain_factor)
         self.query_one("#enc-dot-guard-pick", Button).label = dot_guard_pick_label(self._picks.dot_guard_band_px)
+        self.query_one("#enc-margin-pick", Button).label = margin_mm_option_label(self._picks.margin_mm)
 
     def _on_file_picked(self, result: Path | None) -> None:
         if result is None:
@@ -152,22 +163,12 @@ class EncodeScreen(Widget):
         self.query_one("#input-file-label", Static).update(str(result))
         self._rebuild_config()
 
-    def _read_text_inputs(self) -> EncodingFormTextInputs:
-        return EncodingFormTextInputs(
-            rs_redundancy=self.query_one("#enc-rs", Input).value,
-            redundancy_pages=self.query_one("#enc-red-pages", Input).value,
-            margin_top_mm=self.query_one("#enc-margin-t", Input).value,
-            margin_right_mm=self.query_one("#enc-margin-r", Input).value,
-            margin_bottom_mm=self.query_one("#enc-margin-b", Input).value,
-            margin_left_mm=self.query_one("#enc-margin-l", Input).value,
-        )
-
     def _rebuild_config(self) -> None:
         logger = logging.getLogger(__name__)
         info = self.query_one("#encode-info-display", Static)
         try:
             with log_phase(logger, "tui.EncodeScreen.resolve_form"):
-                base = resolve_encoding_form(self._picks, self._read_text_inputs())
+                base = resolve_encoding_form(self._picks)
                 self._config = config_with_page_dimensions(base, self._picks.paper_size)
             with log_phase(logger, "tui.EncodeScreen.update_info_display"):
                 info.update(format_encoding_info_panel(self._config, self._picks.paper_size))

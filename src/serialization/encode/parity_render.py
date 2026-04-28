@@ -15,22 +15,22 @@ OnPageComplete = Callable[[int, int, Path | None], None]
 def extract_page_payloads(
     payload: bytes, config: PaperClipConfig, data_pages: int,
 ) -> list[bytes]:
-    from common.symbols import chunk_params, symbol_count
+    from common.symbols import chunk_params
     from common.symbols import symbols_to_bytes as syms_to_raw
 
     cap = data_capacity_bytes(config)
-    k, m = chunk_params(symbol_count(config.num_colors))
+    k, m = chunk_params(config.num_symbols)
     page_payloads: list[bytes] = []
     for page in range(data_pages):
         chunk = payload[page * cap : (page + 1) * cap]
-        syms = bytes_to_symbols(chunk, config.num_colors)
-        page_payloads.append(syms_to_raw(syms, config.num_colors, (len(syms) // m) * k))
+        syms = bytes_to_symbols(chunk, config.num_symbols)
+        page_payloads.append(syms_to_raw(syms, config.num_symbols, (len(syms) // m) * k))
     return page_payloads
 
 
 def render_parity_pages(
     payload: bytes, config: PaperClipConfig, data_pages: int, total_pages: int,
-    sha256_hash: bytes, file_size: int, flags: int,
+    payload_sha256: bytes,
     on_page_complete: OnPageComplete | None,
 ) -> list[Image.Image]:
     from common.fountain import encode_parity_pages
@@ -43,11 +43,11 @@ def render_parity_pages(
     images: list[Image.Image] = []
     for r_idx, pp in enumerate(parity_payloads):
         page_idx = data_pages + r_idx
-        syms = bytes_to_symbols(pp, config.num_colors)
+        syms = bytes_to_symbols(pp, config.num_symbols)
         grid = _sparse_symbol_grid(syms, cols, rows, valid_order)
         image = render_page(
             grid, page_idx, total_pages, data_pages,
-            sha256_hash, file_size, config, flags,
+            payload_sha256, config,
         )
         images.append(image)
         if on_page_complete:

@@ -1,11 +1,13 @@
 import logging
 from pathlib import Path
 
-from common.config import PaperClipConfig
+from common.codec import rs_encoded_stream_data_vs_parity
+from common.config import BLOCK_SIZE, PaperClipConfig
 from common.perf import log_phase
 from common.page_layout import data_capacity_bytes, grid_dimensions, page_image_size, usable_area_px
+from common.color_picker import symbol_option_label
 from common.palette import palette_from_config
-from common.symbols import bits_per_cell, symbol_count
+from common.symbols import bits_per_cell
 
 _PALETTE_PREVIEW_MAX_COLORS = 48
 
@@ -51,28 +53,46 @@ def _format_encoding_info_panel_body(config: PaperClipConfig, paper_size: str) -
     cols, rows = grid_dimensions(config)
     pw, ph = page_image_size(config)
     uw, uh = usable_area_px(config)
-    bpc = bits_per_cell(config.num_colors)
-    sc = symbol_count(config.num_colors)
+    bpc = bits_per_cell(config.num_symbols)
+    sc = config.num_symbols
     capacity = data_capacity_bytes(config)
-    if config.num_colors <= _PALETTE_PREVIEW_MAX_COLORS:
+    data_cap, ecc_cap = rs_encoded_stream_data_vs_parity(
+        capacity, BLOCK_SIZE, config.rs_redundancy,
+    )
+    if config.num_symbols <= _PALETTE_PREVIEW_MAX_COLORS:
         palette = palette_from_config(config)
-        palette_lines = "  0: blank\n" + _format_palette_two_columns(palette)
+        w = _symbol_label_width(len(palette))
+        palette_lines = (
+            "  " + _palette_swatch_line(0, (255, 255, 255), w) + "\n"
+            + _format_palette_two_columns(palette)
+        )
     else:
         palette_lines = f"  ({sc} symbols; preview omitted in TUI)"
+    mt, mr, mb, ml = (
+        config.margin_top_mm,
+        config.margin_right_mm,
+        config.margin_bottom_mm,
+        config.margin_left_mm,
+    )
+    if mt == mr == mb == ml:
+        margins_line = f"  Margins: {mt:g} mm (all sides)\n"
+    else:
+        margins_line = f"  Margins mm T/R/B/L: {mt}/{mr}/{mb}/{ml}\n"
     return (
         f"[bold cyan]Encoding Parameters[/bold cyan]\n"
-        f"  Symbols: {sc} (0…{sc - 1})    Cell: {config.cell_size_px}px\n"
+        f"  {symbol_option_label(sc)}    Cell: {config.cell_size_px}px\n"
         f"  Dot gain: {config.dot_gain_factor}    Dot guard: {config.dot_guard_band_px}px\n"
         f"  Bits/cell: {bpc:.2f}    RS redundancy: {config.rs_redundancy:.0%}\n\n"
         f"[bold cyan]Hardware[/bold cyan]\n"
-        f"  Print DPI: {config.print_dpi}    Margins mm T/R/B/L: "
-        f"{config.margin_top_mm}/{config.margin_right_mm}/"
-        f"{config.margin_bottom_mm}/{config.margin_left_mm}\n"
+        f"  Print DPI: {config.print_dpi}\n"
+        f"{margins_line}"
         f"  Paper: {paper_size} ({config.page_width_mm}x{config.page_height_mm}mm, {pw}x{ph}px)\n"
         f"  Usable area: {uw}x{uh}px\n\n"
         f"[bold cyan]Capacity[/bold cyan]\n"
-        f"  Grid: {cols}x{rows} = {cols * rows:,} cells\n"
-        f"  Capacity/page: [bold]{capacity:,}[/bold] bytes ({capacity / 1024:.1f} KB)\n\n"
+        f"  {cols}x{rows} ({cols * rows:,} cells)\n"
+        f"  Total: {capacity:,} B\n"
+        f"  Data: {data_cap:,} B\n"
+        f"  ERR_C: {ecc_cap:,} B\n\n"
         f"[bold cyan]Symbol palette[/bold cyan]\n"
         f"{palette_lines}"
     )

@@ -1,6 +1,6 @@
 from common.config import (
+    APRILTAG_EDGE_CELLS,
     FIDUCIAL_DPI,
-    FINDER_PATTERN_MODULES,
     PaperClipConfig,
     layout_clearance_px,
 )
@@ -47,7 +47,7 @@ def finder_pattern_size(config: PaperClipConfig) -> int:
     c = config.cell_size_px
     d = config.print_dpi
     cell_f = max(1, print_px_to_fiducial_px(c, d, FIDUCIAL_DPI))
-    fp_f = FINDER_PATTERN_MODULES * cell_f
+    fp_f = APRILTAG_EDGE_CELLS * cell_f
     return fiducial_px_to_print_px(fp_f, d, FIDUCIAL_DPI)
 
 

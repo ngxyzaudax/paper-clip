@@ -1,13 +1,14 @@
 import struct
 from dataclasses import dataclass
 
+from common.cell_size_picks import clamp_cell_size_pick
+
 
 MAGIC = b"PCLP"
-FORMAT_VERSION = 9
+HEADER_FORMAT_VERSION = 1
 MARGIN_MM = 3.0
 
 BLOCK_SIZE = 200
-FINDER_PATTERN_MODULES = 7
 TIMING_TRACK_WIDTH = 1
 DOWNSCALE_MAX_DIM = 4000
 APRILTAG_FAMILY = "tag36h11"
@@ -20,13 +21,12 @@ MIN_CELL_SIZE_PX = 5
 LAYOUT_CLEARANCE_DIVISOR = 200
 FIDUCIAL_DPI = 300
 APRILTAG_MESH_N = 5
+APRILTAG_EDGE_CELLS = 7
 APRILTAG_36H11_ID_COUNT = 587
 
 QR_MODULE_PX = 12
 QR_BORDER_MODULES = 2
 QR_VERSION = 5
-
-FLAG_ENCRYPTED = 0x01
 
 
 def qr_image_size_px() -> int:
@@ -43,14 +43,14 @@ def layout_clearance_px(print_dpi: int) -> int:
 
 PAYLOAD_HEADER_REDUNDANCY = 3
 
-HEADER_STRUCT = struct.Struct(">4sBBBBBHHHHHHI32sI")
+HEADER_STRUCT = struct.Struct(">4sBBBBHHHHH32sI")
 PAYLOAD_HEADER_STRUCT = struct.Struct(">IHB")
 
 
 @dataclass(frozen=True)
 class PaperClipConfig:
-    num_colors: int = 4
-    cell_size_px: int = 28
+    num_symbols: int = 5
+    cell_size_px: int = 25
     print_dpi: int = 1200
     rs_redundancy: float = 0.20
     redundancy_pages: int = 0
@@ -65,9 +65,9 @@ class PaperClipConfig:
 
 
 def validate_config(config: PaperClipConfig) -> PaperClipConfig:
-    from common.color_picker import validate_print_ink_count
+    from common.color_picker import validate_print_symbol_count
 
-    validate_print_ink_count(config.num_colors)
+    validate_print_symbol_count(config.num_symbols)
     if config.cell_size_px < MIN_CELL_SIZE_PX:
         raise ValueError(f"cell_size_px must be at least {MIN_CELL_SIZE_PX}")
     if config.print_dpi < 300:
@@ -102,7 +102,7 @@ def validate_config(config: PaperClipConfig) -> PaperClipConfig:
 
 
 ALGO_FIELDS = (
-    "num_colors",
+    "num_symbols",
     "cell_size_px",
     "print_dpi",
     "rs_redundancy",
@@ -117,7 +117,6 @@ def default_config() -> PaperClipConfig:
 
 
 def resolve_config(
-    num_colors: int | None = None,
     num_symbols: int | None = None,
     cell_size_px: int | None = None,
     paper_size: str | None = None,
@@ -134,19 +133,11 @@ def resolve_config(
 ) -> PaperClipConfig:
     from dataclasses import replace
 
-    if num_colors is not None and num_symbols is not None:
-        raise ValueError("pass only one of num_colors and num_symbols")
-    if num_symbols is not None:
-        from common.color_picker import validate_print_symbol_count
-
-        validate_print_symbol_count(num_symbols)
-        num_colors = num_symbols - 1
-
     base = default_config()
     overrides: dict[str, object] = {
         k: v
         for k, v in [
-            ("num_colors", num_colors),
+            ("num_symbols", num_symbols),
             ("cell_size_px", cell_size_px),
             ("print_dpi", print_dpi),
             ("rs_redundancy", rs_redundancy),
@@ -156,6 +147,8 @@ def resolve_config(
         ]
         if v is not None
     }
+    if "cell_size_px" in overrides:
+        overrides["cell_size_px"] = clamp_cell_size_pick(int(overrides["cell_size_px"]))
     if margin_mm is not None:
         overrides["margin_top_mm"] = margin_mm
         overrides["margin_right_mm"] = margin_mm
@@ -183,12 +176,5 @@ def config_from_job_dict(stored: dict) -> PaperClipConfig:
     for name in d:
         if name in stored:
             d[name] = stored[name]
-    if "margin_mm" in stored and "margin_top_mm" not in stored:
-        m = stored["margin_mm"]
-        d["margin_top_mm"] = m
-        d["margin_right_mm"] = m
-        d["margin_bottom_mm"] = m
-        d["margin_left_mm"] = m
-    if "print_dpi" not in stored and "scan_dpi" in stored:
-        d["print_dpi"] = stored["scan_dpi"]
+    d["cell_size_px"] = clamp_cell_size_pick(int(d["cell_size_px"]))
     return validate_config(PaperClipConfig(**d))

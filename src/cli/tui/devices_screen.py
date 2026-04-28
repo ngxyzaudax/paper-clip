@@ -1,14 +1,25 @@
+from __future__ import annotations
+
+from functools import partial
+from typing import Literal
+
 from textual import work
 from textual.app import ComposeResult
-from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widget import Widget
-from textual.widgets import Button, Select, Static
+from textual.widgets import Button, Static
 
-from common.device_config import (
-    get_scanner_settings,
-    save_printer_settings,
-    save_scanner_settings,
+from cli.tui.devices_screen_layout import compose_devices_screen
+from cli.tui.devices_worker import (
+    discover_printers,
+    discover_scanners,
+    format_printer_caps,
+    format_scanner_caps,
+    pick_button_label,
+    printer_section_placeholder,
+    scanner_section_placeholder,
 )
+from cli.tui.option_picker_screen import OptionPickerScreen
+from common.device_config import get_scanner_settings, save_printer_settings, save_scanner_settings
 from common.types import PrinterInfo, ScannerInfo
 
 
@@ -18,25 +29,46 @@ class DevicesScreen(Widget):
         super().__init__()
         self._printers: list[PrinterInfo] = []
         self._scanners: list[ScannerInfo] = []
+        self._printer_options: list[tuple[str, str]] = []
+        self._scanner_options: list[tuple[str, str]] = []
+        self._printer_name: str | None = None
+        self._scanner_device: str | None = None
 
     def compose(self) -> ComposeResult:
-        with VerticalScroll(classes="form-container"):
-            yield Static("Hardware Devices", classes="screen-title")
-            with Vertical(classes="section", id="panel-printers"):
-                yield Static("PRINTERS", classes="section-title")
-                yield Select([], prompt="Discovering...", id="printer-select", compact=True)
-                yield Static("", id="printer-caps", classes="details-panel")
-            with Vertical(classes="section", id="panel-scanners"):
-                yield Static("SCANNERS", classes="section-title")
-                yield Select([], prompt="Discovering...", id="scanner-select", compact=True)
-                yield Static("", id="scanner-caps", classes="details-panel")
-            with Horizontal(classes="button-bar"):
-                yield Button("Refresh", id="btn-refresh", compact=True)
-                yield Button("Save Defaults", variant="primary", id="btn-save", compact=True)
-            yield Static("", id="status")
+        yield from compose_devices_screen()
 
     def on_mount(self) -> None:
         self._discover_devices()
+
+    def _refresh_pick_labels(self) -> None:
+        pr_btn = self.query_one("#printer-pick", Button)
+        sc_btn = self.query_one("#scanner-pick", Button)
+        pr_btn.label = pick_button_label(
+            self._printer_options,
+            self._printer_name,
+            absent_message="[dim]No printers found[/dim]",
+        )
+        sc_btn.label = pick_button_label(
+            self._scanner_options,
+            self._scanner_device,
+            absent_message="[dim]No scanners found[/dim]",
+        )
+        pr_btn.disabled = not self._printer_options
+        sc_btn.disabled = not self._scanner_options
+
+    def _sync_capability_section(self, which: Literal["printer", "scanner"]) -> None:
+        if which == "printer":
+            opts, sel = self._printer_options, self._printer_name
+            ph = printer_section_placeholder(opts, sel)
+            wid = "#printer-caps"
+        else:
+            opts, sel = self._scanner_options, self._scanner_device
+            ph = scanner_section_placeholder(opts, sel)
+            wid = "#scanner-caps"
+        if ph is not None:
+            self.query_one(wid, Static).update(ph)
+        else:
+            self._load_caps(which, sel or "")
 
     @work(thread=True)
     def _discover_devices(self) -> None:
@@ -45,23 +77,18 @@ class DevicesScreen(Widget):
             "[bold]Discovering devices...[/bold]",
         )
         try:
-            from cli.tui.devices_worker import discover_printers, discover_scanners
             pr_opts, pr_init = discover_printers(self._printers)
             sc_opts, sc_init = discover_scanners(self._scanners)
 
             def _update() -> None:
-                pr_sel = self.query_one("#printer-select", Select)
-                pr_sel.set_options(pr_opts)
-                if pr_init != Select.BLANK:
-                    pr_sel.value = pr_init
-                if not pr_opts:
-                    self.query_one("#printer-caps", Static).update("[yellow]No printers found[/yellow]")
-                sc_sel = self.query_one("#scanner-select", Select)
-                sc_sel.set_options(sc_opts)
-                if sc_init != Select.BLANK:
-                    sc_sel.value = sc_init
-                if not sc_opts:
-                    self.query_one("#scanner-caps", Static).update("[yellow]No scanners found[/yellow]")
+                self._printer_options = pr_opts
+                self._scanner_options = sc_opts
+                self._printer_name = pr_init
+                self._scanner_device = sc_init
+                self._refresh_pick_labels()
+                self._sync_capability_section("printer")
+                self._sync_capability_section("scanner")
+
             self.app.call_from_thread(_update)
             self.app.call_from_thread(self.query_one("#status", Static).update, "")
         except Exception as e:
@@ -70,44 +97,52 @@ class DevicesScreen(Widget):
                 f"[red]Discovery error: {e}[/red]",
             )
 
-    def on_select_changed(self, event: Select.Changed) -> None:
-        if event.value == Select.BLANK:
+    def _open_device_picker(self, which: Literal["printer", "scanner"]) -> None:
+        opts = self._printer_options if which == "printer" else self._scanner_options
+        title = "Printer" if which == "printer" else "Scanner"
+        if not opts:
             return
-        if event.select.id == "printer-select":
-            self._load_printer_caps(str(event.value))
-        elif event.select.id == "scanner-select":
-            self._load_scanner_caps(str(event.value))
+        self.app.push_screen(
+            OptionPickerScreen(title, opts),
+            partial(self._on_device_picked, which),
+        )
+
+    def _on_device_picked(self, which: Literal["printer", "scanner"], result: object | None) -> None:
+        if result is None:
+            return
+        s = str(result)
+        if which == "printer":
+            self._printer_name = s
+        else:
+            self._scanner_device = s
+        self._refresh_pick_labels()
+        self._sync_capability_section(which)
 
     @work(thread=True)
-    def _load_printer_caps(self, name: str) -> None:
-        from cli.tui.devices_worker import format_printer_caps
-        text = format_printer_caps(name)
-        self.app.call_from_thread(self.query_one("#printer-caps", Static).update, text)
-
-    @work(thread=True)
-    def _load_scanner_caps(self, device_id: str) -> None:
-        from cli.tui.devices_worker import format_scanner_caps
-        text = format_scanner_caps(device_id)
-        self.app.call_from_thread(self.query_one("#scanner-caps", Static).update, text)
+    def _load_caps(self, which: Literal["printer", "scanner"], key: str) -> None:
+        text = format_printer_caps(key) if which == "printer" else format_scanner_caps(key)
+        wid = "#printer-caps" if which == "printer" else "#scanner-caps"
+        self.app.call_from_thread(self.query_one(wid, Static).update, text)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "btn-refresh":
+        bid = event.button.id
+        if bid == "btn-refresh":
             self._discover_devices()
-        elif event.button.id == "btn-save":
+        elif bid == "btn-save":
             self._save_defaults()
+        elif bid == "printer-pick":
+            self._open_device_picker("printer")
+        elif bid == "scanner-pick":
+            self._open_device_picker("scanner")
 
     def _save_defaults(self) -> None:
-        printer_val = self.query_one("#printer-select", Select).value
-        scanner_val = self.query_one("#scanner-select", Select).value
-        if printer_val != Select.BLANK:
-            save_printer_settings(name=str(printer_val))
-        if scanner_val != Select.BLANK:
+        if self._printer_name:
+            save_printer_settings(name=self._printer_name)
+        if self._scanner_device:
             saved = get_scanner_settings()
             save_scanner_settings(
-                device=str(scanner_val),
+                device=self._scanner_device,
                 dpi=saved.get("dpi", 1200),
                 mode=str(saved.get("mode", "Color")),
             )
-        self.query_one("#status", Static).update(
-            "[bold green]Default devices saved[/bold green]"
-        )
+        self.query_one("#status", Static).update("[bold green]Default devices saved[/bold green]")

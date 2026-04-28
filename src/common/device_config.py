@@ -8,7 +8,6 @@ logger = logging.getLogger(__name__)
 
 CONFIG_DIR = DATA_ROOT
 DEVICE_CONFIG_FILE = CONFIG_DIR / "devices.json"
-LEGACY_SCANNER_FILE = CONFIG_DIR / "scanner.json"
 
 EMPTY_PRINTER: PrinterSettings = {"name": "", "dpi": 0, "paper_size": "A4"}
 EMPTY_SCANNER: ScannerSettings = {"device": "", "dpi": 1200, "mode": "Color"}
@@ -38,23 +37,6 @@ def _merge_scanner(raw: object) -> ScannerSettings:
     return {"device": device, "dpi": dpi, "mode": mode}
 
 
-def _migrate_legacy() -> DeviceConfigFile | None:
-    if not LEGACY_SCANNER_FILE.exists():
-        return None
-    try:
-        legacy = json.loads(LEGACY_SCANNER_FILE.read_text())
-        return {
-            "printer": dict(EMPTY_PRINTER),
-            "scanner": {
-                "device": str(legacy.get("device", "")),
-                "dpi": int(legacy.get("dpi", 1200)),
-                "mode": "Color",
-            },
-        }
-    except (json.JSONDecodeError, KeyError, TypeError, ValueError):
-        return None
-
-
 def load_device_config() -> DeviceConfigFile:
     if DEVICE_CONFIG_FILE.exists():
         try:
@@ -67,10 +49,6 @@ def load_device_config() -> DeviceConfigFile:
             }
         except (json.JSONDecodeError, KeyError, TypeError, ValueError):
             pass
-    migrated = _migrate_legacy()
-    if migrated:
-        save_device_config(migrated)
-        return migrated
     return {"printer": dict(EMPTY_PRINTER), "scanner": dict(EMPTY_SCANNER)}
 
 

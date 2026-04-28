@@ -13,15 +13,13 @@ def render_page(
     page_index: int,
     total_pages: int,
     data_pages: int,
-    data_hash: bytes,
-    data_length: int,
+    payload_sha256: bytes,
     config: PaperClipConfig,
-    flags: int = 0,
 ) -> Image.Image:
     width, height = page_image_size(config)
     image = Image.new("RGB", (width, height), (255, 255, 255))
     header_bytes = encode_header_bytes(
-        config, page_index, total_pages, data_pages, data_hash, data_length, flags
+        config, page_index, total_pages, data_pages, payload_sha256,
     )
     image = render_qr_header(header_bytes, image, config)
     image = render_data_grid(grid, image, config)

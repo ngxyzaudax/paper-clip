@@ -11,6 +11,8 @@ ARGON2_MEMORY_COST = 65536
 ARGON2_PARALLELISM = 4
 KEY_SIZE = 32
 
+DEFAULT_ENCRYPTION_PASSPHRASE = "\x00" * 32
+
 
 def _derive_key(passphrase: str, salt: bytes) -> bytes:
     return hash_secret_raw(
