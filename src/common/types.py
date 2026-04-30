@@ -2,7 +2,6 @@ from typing import NamedTuple
 
 type SymbolGrid = list[list[int]]
 type RGB = tuple[int, int, int]
-type Point = tuple[float, float]
 
 
 class Region(NamedTuple):

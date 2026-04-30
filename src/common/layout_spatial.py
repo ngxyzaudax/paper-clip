@@ -92,8 +92,16 @@ def forbidden_rects_usable(
         expand_rect_clamped(lay.qx, lay.qy, qr_s, qr_s, clearance, uw, uh),
     )
     cell = lay.cell
-    for lx, ly, _, fp in mesh_tag_paste_tuples_for_layout(lay, cell, clearance):
+    tag_boxes = mesh_tag_paste_tuples_for_layout(lay, cell, clearance)
+    for lx, ly, _, fp in tag_boxes:
         rects.append(expand_rect_clamped(lx, ly, fp, fp, clearance, uw, uh))
+    if tag_boxes:
+        min_left = min(lx for lx, _, _, _ in tag_boxes)
+        max_right = max(lx + fp for lx, _, _, fp in tag_boxes)
+        if min_left > 0:
+            rects.append((0, 0, min_left, uh))
+        if max_right < uw:
+            rects.append((max_right, 0, uw - max_right, uh))
     return rects
 
 

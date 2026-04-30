@@ -20,18 +20,29 @@ def create_job(
     encoding_label: str,
     config_dict: dict,
     total_pages: int,
+    *,
+    paper_size: str,
+    data_pages: int,
+    payload_bytes: int,
+    data_capacity_bytes_per_page: int,
 ) -> Path:
     job_id = _generate_job_id(source_filename)
     job_dir = JOBS_DIR / job_id
     job_dir.mkdir(parents=True, exist_ok=True)
     (job_dir / "digital").mkdir(exist_ok=True)
     (job_dir / "scans").mkdir(exist_ok=True)
+    max_payload_bytes = data_capacity_bytes_per_page * data_pages
     metadata = {
         "job_id": job_id,
         "source_file": source_filename,
         "encoding": encoding_label,
         "config": config_dict,
         "total_pages": total_pages,
+        "paper_size": paper_size,
+        "data_pages": data_pages,
+        "payload_bytes": payload_bytes,
+        "data_capacity_bytes_per_page": data_capacity_bytes_per_page,
+        "max_payload_bytes_for_data_pages": max_payload_bytes,
         "created": datetime.now().isoformat(),
     }
     (job_dir / "job.json").write_text(json.dumps(metadata, indent=2))

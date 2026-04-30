@@ -1,27 +1,22 @@
 import struct
 from dataclasses import dataclass
 
-from common.cell_size_picks import clamp_cell_size_pick
+from common.cell_size_picks import validate_cell_size_pick
 
 
 MAGIC = b"PCLP"
 HEADER_FORMAT_VERSION = 1
-MARGIN_MM = 3.0
+MARGIN_MM = 3.56
 
 BLOCK_SIZE = 200
 TIMING_TRACK_WIDTH = 1
 DOWNSCALE_MAX_DIM = 4000
 APRILTAG_FAMILY = "tag36h11"
 
-DOT_GAIN_FACTOR = 1.8
-MIN_DOT_GAIN_FACTOR = 1.05
-MAX_DOT_GAIN_FACTOR = 3.0
-GUARD_BAND_PX = 1
-MIN_CELL_SIZE_PX = 5
 LAYOUT_CLEARANCE_DIVISOR = 200
 FIDUCIAL_DPI = 300
 APRILTAG_MESH_N = 5
-APRILTAG_EDGE_CELLS = 7
+APRILTAG_EDGE_CELLS = 9
 APRILTAG_36H11_ID_COUNT = 587
 
 QR_MODULE_PX = 12
@@ -50,12 +45,10 @@ PAYLOAD_HEADER_STRUCT = struct.Struct(">IHB")
 @dataclass(frozen=True)
 class PaperClipConfig:
     num_symbols: int = 5
-    cell_size_px: int = 25
+    cell_size_px: int = 10
     print_dpi: int = 1200
     rs_redundancy: float = 0.20
     redundancy_pages: int = 0
-    dot_gain_factor: float = DOT_GAIN_FACTOR
-    dot_guard_band_px: int = GUARD_BAND_PX
     page_width_mm: float = 210.0
     page_height_mm: float = 297.0
     margin_top_mm: float = MARGIN_MM
@@ -68,22 +61,13 @@ def validate_config(config: PaperClipConfig) -> PaperClipConfig:
     from common.color_picker import validate_print_symbol_count
 
     validate_print_symbol_count(config.num_symbols)
-    if config.cell_size_px < MIN_CELL_SIZE_PX:
-        raise ValueError(f"cell_size_px must be at least {MIN_CELL_SIZE_PX}")
+    validate_cell_size_pick(config.cell_size_px)
     if config.print_dpi < 300:
         raise ValueError("print_dpi must be at least 300")
     if config.rs_redundancy < 0.05 or config.rs_redundancy > 0.50:
         raise ValueError("rs_redundancy must be between 0.05 and 0.50")
     if config.redundancy_pages < 0:
         raise ValueError("redundancy_pages must be non-negative")
-    if config.dot_gain_factor < MIN_DOT_GAIN_FACTOR or config.dot_gain_factor > MAX_DOT_GAIN_FACTOR:
-        raise ValueError(
-            f"dot_gain_factor must be between {MIN_DOT_GAIN_FACTOR} and {MAX_DOT_GAIN_FACTOR}",
-        )
-    if config.dot_guard_band_px < 0:
-        raise ValueError("dot_guard_band_px must be non-negative")
-    if config.cell_size_px <= 2 * config.dot_guard_band_px + 3:
-        raise ValueError("dot_guard_band_px is too large for cell_size_px")
     if config.page_width_mm <= 0 or config.page_height_mm <= 0:
         raise ValueError("page dimensions must be positive")
     for name in (
@@ -107,8 +91,6 @@ ALGO_FIELDS = (
     "print_dpi",
     "rs_redundancy",
     "redundancy_pages",
-    "dot_gain_factor",
-    "dot_guard_band_px",
 )
 
 
@@ -123,8 +105,6 @@ def resolve_config(
     print_dpi: int | None = None,
     rs_redundancy: float | None = None,
     redundancy_pages: int | None = None,
-    dot_gain_factor: float | None = None,
-    dot_guard_band_px: int | None = None,
     margin_mm: float | None = None,
     margin_top_mm: float | None = None,
     margin_right_mm: float | None = None,
@@ -142,13 +122,9 @@ def resolve_config(
             ("print_dpi", print_dpi),
             ("rs_redundancy", rs_redundancy),
             ("redundancy_pages", redundancy_pages),
-            ("dot_gain_factor", dot_gain_factor),
-            ("dot_guard_band_px", dot_guard_band_px),
         ]
         if v is not None
     }
-    if "cell_size_px" in overrides:
-        overrides["cell_size_px"] = clamp_cell_size_pick(int(overrides["cell_size_px"]))
     if margin_mm is not None:
         overrides["margin_top_mm"] = margin_mm
         overrides["margin_right_mm"] = margin_mm
@@ -176,5 +152,4 @@ def config_from_job_dict(stored: dict) -> PaperClipConfig:
     for name in d:
         if name in stored:
             d[name] = stored[name]
-    d["cell_size_px"] = clamp_cell_size_pick(int(d["cell_size_px"]))
     return validate_config(PaperClipConfig(**d))

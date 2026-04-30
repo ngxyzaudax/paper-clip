@@ -81,7 +81,6 @@ def _format_encoding_info_panel_body(config: PaperClipConfig, paper_size: str) -
     return (
         f"[bold cyan]Encoding Parameters[/bold cyan]\n"
         f"  {symbol_option_label(sc)}    Cell: {config.cell_size_px}px\n"
-        f"  Dot gain: {config.dot_gain_factor}    Dot guard: {config.dot_guard_band_px}px\n"
         f"  Bits/cell: {bpc:.2f}    RS redundancy: {config.rs_redundancy:.0%}\n\n"
         f"[bold cyan]Hardware[/bold cyan]\n"
         f"  Print DPI: {config.print_dpi}\n"

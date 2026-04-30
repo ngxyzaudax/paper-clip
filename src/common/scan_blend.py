@@ -45,12 +45,8 @@ def delta_e_76(lab_a: np.ndarray, lab_b: np.ndarray) -> float:
 
 def dot_area_coverage_ratio(
     cell_size_px: int,
-    dot_guard_band_px: int,
-    dot_gain_factor: float,
 ) -> float:
-    inner = cell_size_px - 2 * dot_guard_band_px
-    fill = 1.0 / dot_gain_factor
-    radius = max(1, int(inner * fill / 2))
+    radius = max(1, int(cell_size_px / 2))
     dot_area = math.pi * float(radius) ** 2
     cell_area = float(cell_size_px) ** 2
     return min(1.0, dot_area / cell_area)
@@ -70,7 +66,7 @@ def build_distinct_print_sequence(
 ) -> tuple[tuple[RGB, ...], tuple[tuple[str, int], ...]]:
     cfg = PaperClipConfig()
     coverage = dot_area_coverage_ratio(
-        cfg.cell_size_px, cfg.dot_guard_band_px, cfg.dot_gain_factor,
+        cfg.cell_size_px,
     )
     groups = ordered_tier_groups()
     accepted_rgb: list[RGB] = []

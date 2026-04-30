@@ -64,7 +64,7 @@ def discover_printers(
 def discover_scanners(
     scanners_out: list[ScannerInfo],
 ) -> tuple[list[tuple[str, str]], str | None]:
-    from common.sane_client import list_scanners
+    from common.sane_discovery import list_scanners
     scanners_out.clear()
     scanners_out.extend(list_scanners())
     saved = get_scanner_settings()
@@ -95,7 +95,7 @@ def format_printer_caps(printer_name: str) -> str:
 
 
 def format_scanner_caps(device_id: str) -> str:
-    from common.sane_client import get_scanner_capabilities
+    from common.sane_discovery import get_scanner_capabilities
     caps = get_scanner_capabilities(device_id)
     if caps is None:
         return "[yellow]Could not read capabilities[/yellow]"

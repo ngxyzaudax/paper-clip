@@ -32,10 +32,10 @@ From the repository root:
    uv run paper-clip --help
    ```
 
-3. **(Optional) ML training and TensorFlow-backed decode path** — install the extra dependency group from `pyproject.toml`:
+3. **(Optional) hardware discovery support** — install scanner/printer integration extras:
 
    ```bash
-   uv sync --extra ml
+   uv sync --extra hardware
    ```
 
 ### Everyday commands
@@ -85,6 +85,14 @@ Runtime data lives under **`data/`**, mainly `jobs/` (`digital/`, `scans/`, etc.
 
 ---
 
-## Python dependencies (core)
+## Python dependencies
 
-Typer, Rich, Textual, Pillow, NumPy, OpenCV (headless), scikit-image, AprilTag bindings, zstandard, reedsolomon, cryptography, Argon2, QR/barcode libraries, `python-sane`, `pycups`, and related stack — see `pyproject.toml` and `uv.lock` for exact versions.
+Core dependencies are declared in `pyproject.toml` and pinned in `uv.lock`.
+
+Hardware discovery integrations are optional and installed with:
+
+```bash
+uv sync --extra hardware
+```
+
+This extra includes `pycups` and `python-sane`.

@@ -305,14 +305,18 @@ dependencies = [
     { name = "numpy" },
     { name = "opencv-python-headless" },
     { name = "pillow" },
-    { name = "pycups" },
-    { name = "python-sane" },
     { name = "qrcode" },
     { name = "reedsolo" },
     { name = "rich" },
     { name = "textual" },
     { name = "typer" },
     { name = "zstandard" },
+]
+
+[package.optional-dependencies]
+hardware = [
+    { name = "pycups" },
+    { name = "python-sane" },
 ]
 
 [package.metadata]
@@ -322,8 +326,8 @@ requires-dist = [
     { name = "numpy" },
     { name = "opencv-python-headless" },
     { name = "pillow" },
-    { name = "pycups" },
-    { name = "python-sane" },
+    { name = "pycups", marker = "extra == 'hardware'" },
+    { name = "python-sane", marker = "extra == 'hardware'" },
     { name = "qrcode", specifier = ">=8.2" },
     { name = "reedsolo" },
     { name = "rich" },
@@ -331,6 +335,7 @@ requires-dist = [
     { name = "typer" },
     { name = "zstandard" },
 ]
+provides-extras = ["hardware"]
 
 [[package]]
 name = "pillow"

@@ -5,7 +5,8 @@ from typing import Callable
 
 from common.config import ALGO_FIELDS, PaperClipConfig
 from common.data_store import create_job, digital_dir
-from common.page_layout import pages_needed
+from common.page_layout import data_capacity_bytes, pages_needed
+from common.paper_sizes import detect_paper_size
 from serialization.encode.encoder import prepare_payload
 from serialization.encode.pipeline import encode
 
@@ -36,9 +37,17 @@ def run_tui_encode_job(
         "margin_right_mm",
         "margin_bottom_mm",
         "margin_left_mm",
+        "page_width_mm",
+        "page_height_mm",
     ):
         config_dict[k] = getattr(config, k)
-    job_dir = create_job(input_path.name, "inline", config_dict, total_pages)
+    job_dir = create_job(
+        input_path.name, "inline", config_dict, total_pages,
+        paper_size=detect_paper_size(config.page_width_mm, config.page_height_mm),
+        data_pages=data_pages,
+        payload_bytes=len(payload),
+        data_capacity_bytes_per_page=data_capacity_bytes(config),
+    )
     output_base = digital_dir(job_dir) / "page"
     png_paths = encode(
         input_path, output_base, config,

@@ -26,6 +26,5 @@ def render_data_grid(
             color = palette[symbol_idx - 1] if symbol_idx > 0 else None
             draw_dot_cell(
                 draw, x, y, cell, color,
-                config.dot_gain_factor, config.dot_guard_band_px,
             )
     return image

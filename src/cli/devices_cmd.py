@@ -3,7 +3,7 @@ from rich.console import Console
 from rich.table import Table
 
 from common.cups_client import get_printer_capabilities, list_printers
-from common.sane_client import get_scanner_capabilities, list_scanners
+from common.sane_discovery import get_scanner_capabilities, list_scanners
 
 console = Console()
 

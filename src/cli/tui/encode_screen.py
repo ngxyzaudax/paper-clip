@@ -25,10 +25,8 @@ from cli.tui.file_picker import FilePickerScreen
 from common.cell_size_picks import cell_size_pick_label
 from common.color_picker import symbol_option_label
 from common.config import PaperClipConfig
-from common.dot_print_picks import dot_gain_pick_label, dot_guard_pick_label
 from common.paper_sizes import config_with_page_dimensions, paper_size_option_label
 from common.print_dpi_presets import print_dpi_option_label
-from common.margin_mm_picks import margin_mm_option_label
 from common.parity_pages_picks import parity_pages_option_label
 from common.rs_redundancy_picks import rs_redundancy_option_label
 
@@ -92,6 +90,11 @@ class EncodeScreen(Widget):
         if event.input.id == "password-input":
             self._passphrase = event.value or None
             return
+        if event.input.id == "enc-margin-input":
+            try:
+                self._picks.margin_mm = float(event.value)
+            except ValueError:
+                return
         self._schedule_rebuild()
 
     def _schedule_rebuild(self) -> None:
@@ -132,12 +135,6 @@ class EncodeScreen(Widget):
                 self._picks.redundancy_pages = int(result)
             case "enc-paper-pick":
                 self._picks.paper_size = str(result)
-            case "enc-dot-gain-pick":
-                self._picks.dot_gain_factor = float(result)
-            case "enc-dot-guard-pick":
-                self._picks.dot_guard_band_px = int(result)
-            case "enc-margin-pick":
-                self._picks.margin_mm = float(result)
             case _:
                 return
         self._refresh_pick_button_labels()
@@ -152,9 +149,6 @@ class EncodeScreen(Widget):
             self._picks.redundancy_pages,
         )
         self.query_one("#enc-paper-pick", Button).label = paper_size_option_label(self._picks.paper_size)
-        self.query_one("#enc-dot-gain-pick", Button).label = dot_gain_pick_label(self._picks.dot_gain_factor)
-        self.query_one("#enc-dot-guard-pick", Button).label = dot_guard_pick_label(self._picks.dot_guard_band_px)
-        self.query_one("#enc-margin-pick", Button).label = margin_mm_option_label(self._picks.margin_mm)
 
     def _on_file_picked(self, result: Path | None) -> None:
         if result is None:

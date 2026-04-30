@@ -48,8 +48,6 @@ def _show_encoding_plan(
         ("Grid", f"{cols} x {rows} cells"),
         ("Page image", f"{pw} x {ph} px"),
         ("RS redundancy", f"{config.rs_redundancy:.0%}"),
-        ("Dot gain", f"{config.dot_gain_factor}"),
-        ("Dot guard px", str(config.dot_guard_band_px)),
     ], title="Encoding Configuration")
     console.print("\n[bold]Symbol palette:[/bold]")
     r0, g0, b0 = 255, 255, 255
@@ -82,12 +80,13 @@ def encode_command(
         None,
         "--num-symbols",
         help=(
-            "Per-cell alphabet size (symbols 0…N-1; 0 blank). "
-            "Inks follow tiered CMYK mixes (primaries, 2-ink, K-tints, 3-ink), "
-            "deduplicated for scan contrast at default dot size."
+            "Per-cell alphabet: 5=CMYK+blank, 8=+R/G/B overprints+blank, 11=+K-tints+blank; "
+            "0 is always blank. Allowed values: 5, 8, 11."
         ),
     ),
-    cell_size_px: int | None = typer.Option(None, help="Cell size in pixels"),
+    cell_size_px: int | None = typer.Option(
+        None, help="Cell size in pixels. Allowed values: 10, 15, 20, 25.",
+    ),
     paper_size: str | None = typer.Option(None, help="Paper size (A3, A4, A5, Letter, Legal, etc.)"),
     print_dpi: int | None = typer.Option(None, help="Logical page DPI for layout and print hints"),
     rs_redundancy: float | None = typer.Option(None, help="Reed–Solomon redundancy (0.05–0.50)"),
@@ -97,14 +96,6 @@ def encode_command(
     margin_right_mm: float | None = typer.Option(None, help="Right page margin in mm"),
     margin_bottom_mm: float | None = typer.Option(None, help="Bottom page margin in mm"),
     margin_left_mm: float | None = typer.Option(None, help="Left page margin in mm"),
-    dot_gain_factor: float | None = typer.Option(
-        None,
-        help="Dot gain: higher = smaller printed dot (more white margin). Typical 1.2–2.4",
-    ),
-    dot_guard_band_px: int | None = typer.Option(
-        None,
-        help="Inner padding around each dot in pixels (0 = tightest)",
-    ),
     password: str | None = typer.Option(
         None,
         help="Passphrase for payload encryption (built-in default key when omitted)",
@@ -119,7 +110,6 @@ def encode_command(
         num_symbols, cell_size_px, paper_size,
         print_dpi, rs_redundancy, redundancy_pages, margin_mm,
         margin_top_mm, margin_right_mm, margin_bottom_mm, margin_left_mm,
-        dot_gain_factor, dot_guard_band_px,
     )
 
     from serialization.encode.encoder import prepare_payload
@@ -137,9 +127,17 @@ def encode_command(
         "margin_right_mm",
         "margin_bottom_mm",
         "margin_left_mm",
+        "page_width_mm",
+        "page_height_mm",
     ):
         config_dict[k] = getattr(config, k)
-    job_dir = create_job(input_file.name, "inline", config_dict, total_pages)
+    job_dir = create_job(
+        input_file.name, "inline", config_dict, total_pages,
+        paper_size=detect_paper_size(config.page_width_mm, config.page_height_mm),
+        data_pages=data_pages,
+        payload_bytes=len(payload),
+        data_capacity_bytes_per_page=data_capacity_bytes(config),
+    )
     output_base = digital_dir(job_dir) / "page"
     console.print(f"[cyan]Job created: {job_dir}[/cyan]\n")
 

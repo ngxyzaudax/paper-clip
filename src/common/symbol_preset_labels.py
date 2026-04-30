@@ -30,6 +30,13 @@ def compact_preset_for_ink_count(ink_count: int) -> str:
 
 
 def symbol_row_label(symbol_count: int) -> str:
+    named = {
+        5: "5 sym · CMYK + blank",
+        8: "8 sym · CMYK + R/G/B + blank",
+        11: "11 sym · CMYK + R/G/B + K-tint + blank",
+    }.get(symbol_count)
+    if named:
+        return named
     preset = compact_preset_for_ink_count(symbol_count - 1)
     base = f"{symbol_count} sym"
     return f"{base} · {preset}" if preset else base

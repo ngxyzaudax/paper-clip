@@ -20,6 +20,10 @@ dependencies = [
     "qrcode>=8.2",
     "argon2-cffi>=25.1.0",
     "cryptography>=46.0.6",
+]
+
+[project.optional-dependencies]
+hardware = [
     "pycups",
     "python-sane",
 ]
