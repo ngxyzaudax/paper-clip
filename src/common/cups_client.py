@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 
 from common.types import PrinterCapabilities, PrinterInfo
 
@@ -46,3 +47,31 @@ def get_printer_capabilities(printer_name: str) -> PrinterCapabilities | None:
         return None
     from common.cups_capabilities import get_printer_capabilities as _get_caps
     return _get_caps(conn, printer_name)
+
+
+def print_files(
+    printer_name: str,
+    files: list[Path],
+    job_title: str,
+    options: dict[str, str] | None = None,
+) -> list[int]:
+    conn = _get_connection()
+    if conn is None:
+        raise RuntimeError("Printer connection unavailable")
+    if not printer_name:
+        raise ValueError("printer_name is required")
+    printers = conn.getPrinters()
+    if printer_name not in printers:
+        raise RuntimeError(f"Printer not found: {printer_name}")
+    if not files:
+        raise ValueError("No files to print")
+    opts = options or {}
+    job_ids: list[int] = []
+    total = len(files)
+    for idx, file_path in enumerate(files, start=1):
+        if not file_path.exists():
+            raise FileNotFoundError(str(file_path))
+        title = f"{job_title} ({idx}/{total})" if total > 1 else job_title
+        job_id = conn.printFile(printer_name, str(file_path), title, opts)
+        job_ids.append(int(job_id))
+    return job_ids

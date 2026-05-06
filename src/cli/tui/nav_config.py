@@ -6,12 +6,16 @@ NAV_GROUPS: list[tuple[str, list[tuple[str, str, str]]]] = [
     ]),
     ("HARDWARE", [
         ("nav-devices", "Devices", "DEV"),
+        ("nav-print", "Print", "PRT"),
+        ("nav-scan", "Scan", "SCN"),
     ]),
 ]
 
 PANEL_REGISTRY: dict[str, tuple[str, str]] = {
     "nav-encode": ("cli.tui.encode_screen", "EncodeScreen"),
     "nav-devices": ("cli.tui.devices_screen", "DevicesScreen"),
+    "nav-print": ("cli.tui.print_screen", "PrintScreen"),
+    "nav-scan": ("cli.tui.scan_screen", "ScanScreen"),
 }
 
 NAV_FULL: dict[str, str] = {i: l for _, g in NAV_GROUPS for i, l, _ in g}

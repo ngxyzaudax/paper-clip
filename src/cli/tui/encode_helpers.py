@@ -123,5 +123,5 @@ def format_encoding_plan(
     return (
         f"[bold]Encoding Plan:[/bold]  {input_path.name}  file {sz:,} B  payload {plen:,} B\n"
         f"Data pages: {data_pages}  total {total_pages}  |  Utilization: {util:.1f}%  |  "
-        f"Output: data/jobs/..."
+        f"Output: data/print/jobs/..."
     )

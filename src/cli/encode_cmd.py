@@ -14,7 +14,7 @@ from cli.display import (
 )
 from cli.encoding_cli import cli_encoding_config
 from common.config import ALGO_FIELDS, PaperClipConfig
-from common.data_store import create_job, digital_dir
+from common.data_store import create_print_job, digital_dir
 from common.page_layout import data_capacity_bytes, grid_dimensions, page_image_size, pages_needed
 from common.palette import palette_from_config
 from common.paper_sizes import detect_paper_size
@@ -101,7 +101,7 @@ def encode_command(
         help="Passphrase for payload encryption (built-in default key when omitted)",
     ),
 ) -> None:
-    """Encode a file into print-ready PNG page(s). Saves into data/jobs/ by default."""
+    """Encode a file into print-ready PNG page(s). Saves into data/print/jobs/ by default."""
     if not input_file.exists():
         print_error(f"File not found: {input_file}")
         raise typer.Exit(1)
@@ -131,7 +131,7 @@ def encode_command(
         "page_height_mm",
     ):
         config_dict[k] = getattr(config, k)
-    job_dir = create_job(
+    job_dir = create_print_job(
         input_file.name, "inline", config_dict, total_pages,
         paper_size=detect_paper_size(config.page_width_mm, config.page_height_mm),
         data_pages=data_pages,

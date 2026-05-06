@@ -6,7 +6,8 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 DATA_ROOT = Path("data")
-JOBS_DIR = DATA_ROOT / "jobs"
+PRINT_JOBS_DIR = DATA_ROOT / "print" / "jobs"
+SCAN_JOBS_DIR = DATA_ROOT / "scan" / "jobs"
 
 
 def _generate_job_id(source_name: str) -> str:
@@ -15,7 +16,7 @@ def _generate_job_id(source_name: str) -> str:
     return f"{stamp}_{stem}"
 
 
-def create_job(
+def create_print_job(
     source_filename: str,
     encoding_label: str,
     config_dict: dict,
@@ -27,13 +28,13 @@ def create_job(
     data_capacity_bytes_per_page: int,
 ) -> Path:
     job_id = _generate_job_id(source_filename)
-    job_dir = JOBS_DIR / job_id
+    job_dir = PRINT_JOBS_DIR / job_id
     job_dir.mkdir(parents=True, exist_ok=True)
     (job_dir / "digital").mkdir(exist_ok=True)
-    (job_dir / "scans").mkdir(exist_ok=True)
     max_payload_bytes = data_capacity_bytes_per_page * data_pages
     metadata = {
         "job_id": job_id,
+        "kind": "print",
         "source_file": source_filename,
         "encoding": encoding_label,
         "config": config_dict,
@@ -46,11 +47,40 @@ def create_job(
         "created": datetime.now().isoformat(),
     }
     (job_dir / "job.json").write_text(json.dumps(metadata, indent=2))
-    logger.info("Created job %s at %s", job_id, job_dir)
+    logger.info("Created print job %s at %s", job_id, job_dir)
+    return job_dir
+
+
+def create_scan_job(
+    scanner_name: str,
+    dpi: int,
+    *,
+    mode: str = "",
+) -> Path:
+    job_id = _generate_job_id("scan")
+    job_dir = SCAN_JOBS_DIR / job_id
+    job_dir.mkdir(parents=True, exist_ok=True)
+    (job_dir / "scans").mkdir(exist_ok=True)
+    metadata = {
+        "job_id": job_id,
+        "kind": "scan",
+        "scanner_name": scanner_name,
+        "dpi": dpi,
+        "mode": mode,
+        "created": datetime.now().isoformat(),
+    }
+    (job_dir / "job.json").write_text(json.dumps(metadata, indent=2))
+    logger.info("Created scan job %s at %s", job_id, job_dir)
     return job_dir
 
 
 def digital_dir(job_dir: Path) -> Path:
     d = job_dir / "digital"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def scans_dir(job_dir: Path) -> Path:
+    d = job_dir / "scans"
     d.mkdir(parents=True, exist_ok=True)
     return d

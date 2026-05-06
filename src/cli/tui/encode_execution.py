@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Callable
 
 from common.config import ALGO_FIELDS, PaperClipConfig
-from common.data_store import create_job, digital_dir
+from common.data_store import create_print_job, digital_dir
 from common.page_layout import data_capacity_bytes, pages_needed
 from common.paper_sizes import detect_paper_size
 from serialization.encode.encoder import prepare_payload
@@ -41,7 +41,7 @@ def run_tui_encode_job(
         "page_height_mm",
     ):
         config_dict[k] = getattr(config, k)
-    job_dir = create_job(
+    job_dir = create_print_job(
         input_path.name, "inline", config_dict, total_pages,
         paper_size=detect_paper_size(config.page_width_mm, config.page_height_mm),
         data_pages=data_pages,

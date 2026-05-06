@@ -18,7 +18,8 @@ src/ml/models/*.pth
 src/ml/models/*.onnx
 src/ml/models/*.tflite
 data/training/
-data/jobs/
+data/print/jobs/
+data/scan/jobs/
 data/models/
 
 # Datasets and calibration pipeline (large / generated)

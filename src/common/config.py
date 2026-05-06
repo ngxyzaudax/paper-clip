@@ -6,7 +6,7 @@ from common.cell_size_picks import validate_cell_size_pick
 
 MAGIC = b"PCLP"
 HEADER_FORMAT_VERSION = 1
-MARGIN_MM = 3.56
+MARGIN_MM = 0.0
 
 BLOCK_SIZE = 200
 TIMING_TRACK_WIDTH = 1
