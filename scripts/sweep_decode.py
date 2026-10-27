@@ -1,41 +1,62 @@
 import argparse
+import json
 from pathlib import Path
 
-import numpy as np
-
-from common.config import resolve_config
-from scan_sim import apply_scan_augment
-from serialization.decode.errors import DecodeError
-from serialization.decode.pipeline import decode
-from scan_sim.render import render_arrays
+from scan_sim.sweep import PROTOCOL_BYTES, PROTOCOL_DECODERS, PROTOCOL_SAMPLES, PROTOCOL_STRENGTHS, SweepRow, run_sweep
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Decode success rate across synthetic scan strengths.")
-    parser.add_argument("--samples", type=int, default=4)
-    parser.add_argument("--strengths", type=float, nargs="+", default=[0.0, 0.25, 0.5, 0.75, 1.0])
-    parser.add_argument("--bytes", type=int, default=180)
-    parser.add_argument("--use-model", action="store_true")
+    parser = argparse.ArgumentParser(description="Decode success, symbol error, erasures, and runtime.")
+    parser.add_argument("--samples", type=int, default=PROTOCOL_SAMPLES)
+    parser.add_argument("--strengths", type=float, nargs="+", default=list(PROTOCOL_STRENGTHS))
+    parser.add_argument("--bytes", type=int, nargs="+", default=list(PROTOCOL_BYTES))
+    parser.add_argument("--decoders", nargs="+", choices=["colour", "model", "both"], default=["both"])
+    parser.add_argument("--model", type=Path, default=None)
+    parser.add_argument("--json", type=Path, default=None)
     args = parser.parse_args()
-    config = resolve_config(paper_size="A6", print_dpi=360, cell_size_px=18, margin_mm=10)
-    print(f"{'strength':>10} {'ok':>6} {'rate':>8}")
-    for strength in args.strengths:
-        ok = 0
-        for index in range(args.samples):
-            rng = np.random.default_rng(10_000 + index * 17 + int(strength * 1000))
-            payload = rng.integers(0, 256, size=args.bytes, dtype=np.uint8).tobytes()
-            pages = render_arrays(payload, config, filename=f"sweep-{index}.bin")
-            scans = [
-                apply_scan_augment(page, strength, config.print_dpi, np.random.default_rng(rng.integers(1, 1_000_000_000)))
-                for page in pages
-            ]
-            try:
-                recovered, _name = decode(scans, use_model=True if args.use_model else False)
-                ok += int(recovered == payload)
-            except DecodeError:
-                ok += 0
-        rate = ok / args.samples if args.samples else 0.0
-        print(f"{strength:10.2f} {ok:6d} {rate:8.1%}")
+    decoders = _decoders(args.decoders)
+    rows: list[SweepRow] = []
+    _print_header()
+    run_sweep(
+        samples=args.samples,
+        strengths=tuple(args.strengths),
+        sizes=tuple(args.bytes),
+        decoders=decoders,
+        model_path=str(args.model) if args.model else None,
+        on_row=lambda row: _collect(rows, row),
+    )
+    if args.json is not None:
+        args.json.write_text(json.dumps([row._asdict() for row in rows], indent=2) + "\n")
+
+
+def _decoders(names: list[str]) -> tuple[str, ...]:
+    if "both" in names:
+        return PROTOCOL_DECODERS
+    ordered = [name for name in PROTOCOL_DECODERS if name in names]
+    return tuple(ordered)
+
+
+def _collect(rows: list[SweepRow], row: SweepRow) -> None:
+    rows.append(row)
+    _print_row(row)
+
+
+def _print_header() -> None:
+    print(
+        f"{'strength':>8} {'bytes':>6} {'decoder':>8} {'ok':>8} {'success':>8} "
+        f"{'sym_err':>8} {'erasures':>9} {'located':>7} {'sec':>7}",
+        flush=True,
+    )
+
+
+def _print_row(row: SweepRow) -> None:
+    erasures = "nan" if row.located == 0 else f"{row.mean_erasures:.1f}"
+    print(
+        f"{row.strength:8.2f} {row.nbytes:6d} {row.decoder:>8} "
+        f"{row.ok:3d}/{row.samples:<3d} {row.success_rate:8.1%} "
+        f"{row.symbol_error_rate:8.1%} {erasures:>9} {row.located:7d} {row.mean_seconds:7.2f}",
+        flush=True,
+    )
 
 
 if __name__ == "__main__":

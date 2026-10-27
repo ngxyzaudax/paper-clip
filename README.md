@@ -90,7 +90,7 @@ Format version is **2**. Defaults target an Epson ET-8500 used with Epson’s ow
 
 3. **Decode:** `paper-clip decode` loads a scan, reads the QR header, finds the tag grid, dewarps with a piecewise mesh (global homography if only a few tags are visible), samples cells, and classifies them. A saved TensorFlow 2 network is used when `models/cell_decoder.keras` is present; otherwise, or with `--no-model`, classification is nearest-colour in Lab against the calibration strip. Low confidence becomes Reed–Solomon erasures. Then decrypt, decompress, reassemble, and check the original SHA-256. Extra parity pages can rebuild a missing page.
 
-4. **Tests:** `uv run pytest` runs the fast suite. `uv run python scripts/sweep_decode.py` reports decode success across augmentation strengths. `uv run python scripts/train_cell_decoder.py` retrains the cell decoder on the same photometric and ink model.
+4. **Tests:** `uv run pytest` runs the fast suite. `uv run python scripts/sweep_decode.py` reports success, pre-RS symbol error, erasures, and decode time across strengths, payload sizes, and both decoders (20 fixed-seed samples by default). `uv run python scripts/train_cell_decoder.py` retrains the cell decoder on the same photometric and ink model.
 
 ---
 

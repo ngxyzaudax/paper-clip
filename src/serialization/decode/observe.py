@@ -20,6 +20,8 @@ class PageObservation(NamedTuple):
     header: DecodedQrHeader
     data: bytes
     erasures: tuple[int, ...]
+    symbols: tuple[int, ...]
+    confidence: tuple[float, ...]
 
 
 def observe_page(image: np.ndarray, model: object | None) -> PageObservation:
@@ -45,4 +47,4 @@ def observe_page(image: np.ndarray, model: object | None) -> PageObservation:
         chosen.extend([0] * (needed - len(chosen)))
         conf.extend([0.0] * (needed - len(conf)))
     data, erasures = bytes_and_erasures(chosen, conf, header.num_symbols, nbytes)
-    return PageObservation(header, data, tuple(erasures))
+    return PageObservation(header, data, tuple(erasures), tuple(chosen), tuple(conf))
