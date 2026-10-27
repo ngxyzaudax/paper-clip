@@ -12,6 +12,7 @@ from serialization.decode.erasures import bytes_and_erasures
 from serialization.decode.errors import DecodeError
 from serialization.decode.header_config import config_from_header
 from serialization.decode.read_qr import read_qr_header
+from serialization.decode.restore import restore_page
 from serialization.decode.warp_mesh import warp_page
 from serialization.encode.qr_header import DecodedQrHeader
 
@@ -34,9 +35,10 @@ def observe_page(image: np.ndarray, model: object | None) -> PageObservation:
         )
     detected = detect_tags(rotated, {tag.tag_id for tag in geometry.tags})
     warped = warp_page(rotated, geometry, detected, qr_points)
-    dx, dy, refs = calibration_offset_and_refs(warped, geometry, config)
+    colour = restore_page(warped)
+    dx, dy, refs = calibration_offset_and_refs(colour, geometry, config)
     symbols, confidence = classify_cells(
-        warped, geometry, config, dx, dy, refs, model, valid_cells_ordered(config),
+        warped, geometry, config, dx, dy, refs, model, valid_cells_ordered(config), colour,
     )
     plan = page_byte_plan(header.payload_length, data_capacity_bytes(config), header.data_pages, header.num_symbols)
     nbytes = plan.read_len[header.page_index] if header.page_index < header.data_pages else plan.parity_len

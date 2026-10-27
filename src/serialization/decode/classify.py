@@ -15,6 +15,7 @@ def classify_cells(
     references: np.ndarray,
     model: object | None,
     cells: list[tuple[int, int]],
+    colour_image: np.ndarray | None = None,
 ) -> tuple[list[int], list[float]]:
     shift_x, shift_y = dx, dy
     if model is not None:
@@ -30,7 +31,8 @@ def classify_cells(
     if predicted is not None and predicted.shape[:2] != (geometry.rows, geometry.cols):
         predicted = None
     xs, ys = cell_centers(geometry, cells, shift_x, shift_y)
-    colour_sym, colour_conf = nearest_symbols(median_rgb(image, xs, ys, sample_radius(geometry.cell)), references)
+    sampled = image if colour_image is None else colour_image
+    colour_sym, colour_conf = nearest_symbols(median_rgb(sampled, xs, ys, sample_radius(geometry.cell)), references)
     symbols: list[int] = []
     confidence: list[float] = []
     for index, (row, col) in enumerate(cells):

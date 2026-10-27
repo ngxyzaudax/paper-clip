@@ -5,7 +5,7 @@ from common.geometry import PageGeometry
 
 
 def sample_radius(cell: int) -> int:
-    return max(1, dot_radius_px(cell) // 2)
+    return max(1, dot_radius_px(cell) // 4)
 
 
 def median_rgb(image: np.ndarray, xs: np.ndarray, ys: np.ndarray, radius: int) -> np.ndarray:
