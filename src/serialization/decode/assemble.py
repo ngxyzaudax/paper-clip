@@ -21,7 +21,24 @@ def assemble_pages(pages: list[PageObservation], passphrase: str | None) -> tupl
     for index, page in chosen.items():
         slots[index] = page.data
         erasure_map[index] = list(page.erasures)
-    data_slots = _fill_missing(slots, header.data_pages, erasure_map)
+    try:
+        return _decode_slots(slots, erasure_map, header, plan, passphrase)
+    except DecodeError as exc:
+        rescued = _rescue_failed_page(slots, erasure_map, header, plan, passphrase, exc)
+        if rescued is None:
+            raise
+        return rescued
+
+
+def _decode_slots(
+    slots: list[bytes | None],
+    erasure_map: dict[int, list[int]],
+    header,
+    plan,
+    passphrase: str | None,
+) -> tuple[bytes, str]:
+    local_map = {key: list(value) for key, value in erasure_map.items()}
+    data_slots = _fill_missing(list(slots), header.data_pages, local_map)
     stream = bytearray()
     erasures: list[int] = []
     for index, part in enumerate(data_slots):
@@ -30,13 +47,49 @@ def assemble_pages(pages: list[PageObservation], passphrase: str | None) -> tupl
             raise DecodeError(f"data page {index} is incomplete")
         base = len(stream)
         stream.extend(part[:take])
-        erasures.extend(base + item for item in erasure_map.get(index, []) if item < take)
+        erasures.extend(base + item for item in local_map.get(index, []) if item < take)
     payload = bytes(stream)
     if len(payload) != header.payload_length:
         raise DecodeError(
             f"assembled {len(payload)} payload bytes, header says {header.payload_length}"
         )
     return recover_stream(payload, header, erasures, passphrase)
+
+
+def _rescue_failed_page(
+    slots: list[bytes | None],
+    erasure_map: dict[int, list[int]],
+    header,
+    plan,
+    passphrase: str | None,
+    exc: DecodeError,
+) -> tuple[bytes, str] | None:
+    if header.total_pages <= header.data_pages or not _stream_failed(exc):
+        return None
+    present = [index for index in range(header.data_pages) if slots[index] is not None]
+    present.sort(key=lambda index: len(erasure_map.get(index, ())), reverse=True)
+    missing = header.data_pages - len(present)
+    watched = range(header.data_pages, header.total_pages)
+    if sum(slots[index] is not None for index in watched) - missing < 1:
+        return None
+    for index in present:
+        trial = list(slots)
+        trial[index] = None
+        try:
+            return _decode_slots(trial, erasure_map, header, plan, passphrase)
+        except DecodeError:
+            continue
+    return None
+
+
+def _stream_failed(exc: DecodeError) -> bool:
+    text = str(exc)
+    return (
+        "Reed-Solomon" in text
+        or "SHA-256" in text
+        or "decryption or decompression failed" in text
+        or "original length mismatch" in text
+    )
 
 
 def _compatible_header(pages: list[PageObservation]):

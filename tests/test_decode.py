@@ -1,11 +1,13 @@
 import os
 
 import numpy as np
+import pytest
 
 from common.config import resolve_config
 from common.crypto import compute_sha256
 from scan_sim import apply_colour_cast, apply_scan_augment
 from scan_sim.render import render_arrays
+from serialization.decode.errors import DecodeError
 from serialization.decode.pipeline import decode
 
 
@@ -56,6 +58,37 @@ def test_missing_page_is_rebuilt_from_parity() -> None:
     recovered, name = decode(pages[1:], use_model=False)
     assert name == "multi.bin"
     assert recovered == raw
+
+
+def test_distorted_page_is_rebuilt_from_parity() -> None:
+    config = resolve_config(
+        paper_size="A6", print_dpi=360, cell_size_px=18, margin_mm=10, redundancy_pages=1,
+    )
+    raw = os.urandom(1800)
+    pages = render_arrays(raw, config, "distort.bin")
+    assert len(pages) == 3
+    scans = [_paint_data_cells(pages[0], config), pages[1], pages[2]]
+    with pytest.raises(DecodeError, match="Reed-Solomon"):
+        decode(scans[:2], use_model=False)
+    recovered, name = decode(scans, use_model=False)
+    assert name == "distort.bin"
+    assert recovered == raw
+
+
+def _paint_data_cells(image: np.ndarray, config) -> np.ndarray:
+    from common.geometry import page_geometry
+    from common.page_layout import valid_cells_ordered
+
+    geometry = page_geometry(config)
+    painted = image.copy()
+    cell = geometry.cell
+    origin_x = geometry.origin_x
+    origin_y = geometry.origin_y
+    for row, col in valid_cells_ordered(config):
+        y = origin_y + row * cell
+        x = origin_x + col * cell
+        painted[y:y + cell, x:x + cell] = (255, 0, 0)
+    return painted
 
 
 def test_strength_zero_augment_is_a_copy() -> None:
