@@ -29,6 +29,4 @@ class PageGeometry(NamedTuple):
     tags: tuple[TagMark, ...]
     tag_rows: int
     tag_cols: int
-    tag_xs: tuple[float, ...]
-    tag_ys: tuple[float, ...]
     forbidden: tuple[tuple[int, int, int, int], ...]

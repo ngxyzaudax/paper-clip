@@ -74,8 +74,6 @@ def _page_geometry_cached(key: tuple[float | int, ...]) -> PageGeometry:
         tags=tags,
         tag_rows=tag_rows,
         tag_cols=tag_cols,
-        tag_xs=tuple(origin_x + slots[col].x + tag / 2.0 for col in range(tag_cols)),
-        tag_ys=tuple(origin_y + slots[row * tag_cols].y + tag / 2.0 for row in range(tag_rows)),
         forbidden=_forbidden(usable_w, usable_h, centre.block, tags, quiet),
     )
 

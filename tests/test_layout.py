@@ -55,7 +55,6 @@ def test_tag_ids_follow_the_full_mesh(config) -> None:
         assert tag.tag_id == tag.row * geometry.tag_cols + tag.col
     corners = {0, geometry.tag_cols - 1, (geometry.tag_rows - 1) * geometry.tag_cols, geometry.tag_rows * geometry.tag_cols - 1}
     assert corners <= {tag.tag_id for tag in geometry.tags}
-    assert len(geometry.tag_xs) == geometry.tag_cols and len(geometry.tag_ys) == geometry.tag_rows
 
 
 def test_data_fills_every_row_around_the_qr() -> None:

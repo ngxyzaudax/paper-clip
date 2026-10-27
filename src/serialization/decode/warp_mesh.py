@@ -2,8 +2,8 @@ import numpy as np
 
 from common.geometry import PageGeometry, tag_center_xy
 from serialization.decode.errors import DecodeError
-from serialization.decode.warp_grid import warp_piecewise
 from serialization.decode.warp_math import homography, order_quad, project, qr_code_corners, vstack, warp_global
+from serialization.decode.warp_tps import warp_tps
 
 _QR_MATCH_PX = 8.0
 
@@ -27,9 +27,12 @@ def warp_page(
     if len(src) < 4:
         raise DecodeError(f"only {len(detected)} alignment tags found; need at least 4")
     matrix = homography(bsrc, bdst)
-    if len(detected) >= 4:
-        return warp_piecewise(image, geometry, detected, matrix, anchors)
-    return warp_global(image, matrix, geometry.page_w, geometry.page_h)
+    if len(detected) < 4 or abs(float(np.linalg.det(matrix))) < 1e-12:
+        return warp_global(image, matrix, geometry.page_w, geometry.page_h)
+    return warp_tps(
+        image, np.linalg.inv(matrix), vstack(dst, anchors[1]), vstack(src, anchors[0]),
+        geometry.page_w, geometry.page_h,
+    )
 
 
 def _tag_pairs(geometry: PageGeometry, detected: dict[int, np.ndarray]) -> tuple[np.ndarray, np.ndarray]:
