@@ -12,19 +12,30 @@ from serialization.encode.qr_header import DecodedQrHeader, decode_header_bytes
 
 def read_qr_header(image: np.ndarray) -> tuple[np.ndarray, DecodedQrHeader, np.ndarray | None]:
     detectors = _detectors()
-    for rotated in _rotations(image):
-        for view in _views(rotated):
-            for detector in detectors:
-                text, points = _detect(detector, view)
-                header = _header_from_text(text)
-                if header is None:
-                    continue
-                return rotated, header, points
+    found = _first_header(image, (image,), detectors)
+    if found is not None:
+        return found
     rescued = bent_qr_retry(image, detectors, _header_from_text)
     if rescued is not None:
         header, points = rescued
         return image, header, points
+    for rotated in _rotations(image):
+        found = _first_header(rotated, _views(rotated), detectors)
+        if found is not None:
+            return found
     raise DecodeError("QR header not found")
+
+
+def _first_header(
+    rotated: np.ndarray, views: tuple[np.ndarray, ...], detectors: tuple[object, ...],
+) -> tuple[np.ndarray, DecodedQrHeader, np.ndarray | None] | None:
+    for view in views:
+        for detector in detectors:
+            text, points = _detect(detector, view)
+            header = _header_from_text(text)
+            if header is not None:
+                return rotated, header, points
+    return None
 
 
 def _rotations(image: np.ndarray) -> tuple[np.ndarray, ...]:
