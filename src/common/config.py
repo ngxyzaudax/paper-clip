@@ -10,7 +10,7 @@ class PaperClipConfig:
     num_symbols: int = 5
     cell_size_px: int = 32
     print_dpi: int = 720
-    rs_redundancy: float = 0.20
+    rs_redundancy: float = 0.45
     redundancy_pages: int = 0
     page_width_mm: float = 210.0
     page_height_mm: float = 297.0
