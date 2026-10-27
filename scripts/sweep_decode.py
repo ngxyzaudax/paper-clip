@@ -2,7 +2,10 @@ import argparse
 import json
 from pathlib import Path
 
-from scan_sim.sweep import PROTOCOL_BYTES, PROTOCOL_DECODERS, PROTOCOL_SAMPLES, PROTOCOL_STRENGTHS, SweepRow, run_sweep
+from scan_sim.sweep import (
+    PROTOCOL_BYTES, PROTOCOL_DECODERS, PROTOCOL_MARGIN_MM, PROTOCOL_SAMPLES, PROTOCOL_STRENGTHS,
+    SweepRow, run_sweep, sweep_config,
+)
 
 
 def main() -> None:
@@ -11,6 +14,7 @@ def main() -> None:
     parser.add_argument("--strengths", type=float, nargs="+", default=list(PROTOCOL_STRENGTHS))
     parser.add_argument("--bytes", type=int, nargs="+", default=list(PROTOCOL_BYTES))
     parser.add_argument("--decoders", nargs="+", choices=["colour", "model", "both"], default=["both"])
+    parser.add_argument("--margin-mm", type=float, default=PROTOCOL_MARGIN_MM)
     parser.add_argument("--model", type=Path, default=None)
     parser.add_argument("--json", type=Path, default=None)
     args = parser.parse_args()
@@ -22,6 +26,7 @@ def main() -> None:
         strengths=tuple(args.strengths),
         sizes=tuple(args.bytes),
         decoders=decoders,
+        config=sweep_config(args.margin_mm),
         model_path=str(args.model) if args.model else None,
         on_row=lambda row: _collect(rows, row),
     )

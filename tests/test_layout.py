@@ -1,6 +1,6 @@
 import pytest
 
-from common.config import default_config, resolve_config
+from common.config import PaperClipConfig, default_config, resolve_config, validate_config
 from common.format_spec import MIN_MARGIN_MM, PRINTER_MIN_MARGIN_MM
 from common.geometry import page_geometry
 from common.geometry_tags import tag_quiet_px
@@ -76,3 +76,5 @@ def test_margins_stay_out_of_borderless_territory() -> None:
         resolve_config(margin_mm=MIN_MARGIN_MM - 0.5)
     with pytest.raises(ValueError, match="borderless"):
         resolve_config(margin_bottom_mm=0)
+    with pytest.raises(ValueError, match="borderless"):
+        validate_config(PaperClipConfig(margin_left_mm=PRINTER_MIN_MARGIN_MM))

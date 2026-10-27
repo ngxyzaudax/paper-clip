@@ -14,6 +14,7 @@ PROTOCOL_SAMPLES = 20
 PROTOCOL_STRENGTHS = (0.0, 0.25, 0.5, 0.75, 1.0)
 PROTOCOL_BYTES = (64, 160, 400)
 PROTOCOL_DECODERS = ("colour", "model")
+PROTOCOL_MARGIN_MM = 10.0
 
 
 class SweepRow(NamedTuple):
@@ -33,9 +34,9 @@ class SweepRow(NamedTuple):
     mean_seconds: float
 
 
-def sweep_config() -> PaperClipConfig:
+def sweep_config(margin_mm: float = PROTOCOL_MARGIN_MM) -> PaperClipConfig:
     return resolve_config(
-        paper_size="A6", print_dpi=360, cell_size_px=18, margin_mm=10, num_symbols=5,
+        paper_size="A6", print_dpi=360, cell_size_px=18, margin_mm=margin_mm, num_symbols=5,
     )
 
 
