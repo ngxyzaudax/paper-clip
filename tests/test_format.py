@@ -66,6 +66,14 @@ def test_small_test_page_has_capacity() -> None:
     assert data_capacity_bytes(config) > 200
 
 
+def test_a6_sweep_page_has_more_tags_than_3x3() -> None:
+    config = resolve_config(
+        paper_size="A6", print_dpi=360, cell_size_px=18, margin_mm=10, num_symbols=5,
+    )
+    geometry = page_geometry(config)
+    assert len(geometry.tags) > 3 * 3
+
+
 def test_cell_below_minimum_millimetre_is_rejected() -> None:
     with pytest.raises(ValueError):
         resolve_config(cell_size_px=10, print_dpi=1200)

@@ -15,13 +15,16 @@ def warp_page(
     qr_points: np.ndarray | None,
 ) -> np.ndarray:
     src, dst = _tag_pairs(geometry, detected)
-    if qr_points is not None and len(qr_points) == 4 and len(src) >= 4:
-        src, dst = _match_qr(src, dst, qr_points, geometry)
+    border = _corner_pairs(geometry, detected)
+    bsrc, bdst = (src, dst) if border is None else border
+    if qr_points is not None and len(qr_points) == 4 and len(bsrc) >= 4:
+        bsrc, bdst = _match_qr(bsrc, bdst, qr_points, geometry)
     elif qr_points is not None and len(qr_points) == 4 and len(src) < 4:
         src, dst = vstack(src, order_quad(qr_points)), vstack(dst, qr_code_corners(geometry))
+        bsrc, bdst = src, dst
     if len(src) < 4:
         raise DecodeError(f"only {len(detected)} alignment tags found; need at least 4")
-    matrix = homography(src, dst)
+    matrix = homography(bsrc, bdst)
     if len(detected) >= 4:
         return warp_piecewise(image, geometry, detected, matrix)
     return warp_global(image, matrix, geometry.page_w, geometry.page_h)
@@ -37,6 +40,27 @@ def _tag_pairs(geometry: PageGeometry, detected: dict[int, np.ndarray]) -> tuple
         dst.append(np.asarray(tag_center_xy(geometry, tag), np.float32))
     if not src:
         return np.zeros((0, 2), np.float32), np.zeros((0, 2), np.float32)
+    return np.stack(src), np.stack(dst)
+
+
+def _corner_pairs(
+    geometry: PageGeometry, detected: dict[int, np.ndarray],
+) -> tuple[np.ndarray, np.ndarray] | None:
+    corners = {
+        0,
+        geometry.tag_cols - 1,
+        (geometry.tag_rows - 1) * geometry.tag_cols,
+        geometry.tag_rows * geometry.tag_cols - 1,
+    }
+    src: list[np.ndarray] = []
+    dst: list[np.ndarray] = []
+    for tag in geometry.tags:
+        if tag.tag_id not in corners or tag.tag_id not in detected:
+            continue
+        src.append(np.asarray(detected[tag.tag_id], np.float32))
+        dst.append(np.asarray(tag_center_xy(geometry, tag), np.float32))
+    if len(src) < 4:
+        return None
     return np.stack(src), np.stack(dst)
 
 

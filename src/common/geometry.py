@@ -52,7 +52,7 @@ def _page_geometry_cached(key: tuple[float | int, ...]) -> PageGeometry:
     quiet = tag_quiet_px(int(dpi))
     data_h = usable_h - header_h
     tag_rows, tag_cols = choose_tag_grid(usable_w, data_h, tag, quiet, int(dpi))
-    tags = place_tags(usable_w, data_h, header_h, tag, quiet, tag_rows, tag_cols)
+    tags = place_tags(usable_w, data_h, header_h, tag, quiet, tag_rows, tag_cols, int(cell))
     forbidden = _forbidden(usable_w, usable_h, header_h, tags, quiet)
     return PageGeometry(
         page_w=page_w,

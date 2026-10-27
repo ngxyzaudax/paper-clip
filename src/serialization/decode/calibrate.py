@@ -12,8 +12,20 @@ def calibration_offset_and_refs(
     ideal = np.asarray(blank_and_palette(config), np.float32)
     ideal_lab = rgb_to_lab(ideal)
     radius = sample_radius(geometry.cell)
+    strip_dx, strip_dy = _strip_shift(image, geometry, config.num_symbols, radius, ideal_lab)
+    refs = _references(image, geometry, config.num_symbols, strip_dx, strip_dy, radius, ideal)
+    return 0, 0, refs
+
+
+def _strip_shift(
+    image: np.ndarray,
+    geometry: PageGeometry,
+    num_symbols: int,
+    radius: int,
+    ideal_lab: np.ndarray,
+) -> tuple[int, int]:
     scores = {
-        (dx, dy): _score(image, geometry, config.num_symbols, dx, dy, radius, ideal_lab)
+        (dx, dy): _score(image, geometry, num_symbols, dx, dy, radius, ideal_lab)
         for dy in range(-6, 7)
         for dx in range(-6, 7)
     }
@@ -21,7 +33,7 @@ def calibration_offset_and_refs(
     good = [offset for offset, score in scores.items() if score <= best + 1.0]
     dx = int(round(sum(item[0] for item in good) / len(good)))
     dy = int(round(sum(item[1] for item in good) / len(good)))
-    return dx, dy, _references(image, geometry, config.num_symbols, dx, dy, radius, ideal)
+    return dx, dy
 
 
 def _score(

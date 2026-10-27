@@ -14,7 +14,7 @@ def tag_quiet_px(dpi: int) -> int:
 
 
 def choose_tag_grid(width: int, height: int, tag: int, quiet: int, dpi: int) -> tuple[int, int]:
-    pitch = max(tag + 2 * quiet + mm_to_px(6.0, dpi), mm_to_px(TAG_TARGET_PITCH_MM, dpi))
+    pitch = max(tag + 2 * quiet, mm_to_px(TAG_TARGET_PITCH_MM, dpi))
     cols = max(2, min(5, max(1, width // pitch)))
     rows = max(2, min(6, max(1, height // pitch)))
     cols = _fit_count(cols, width, tag, quiet)
@@ -25,7 +25,7 @@ def choose_tag_grid(width: int, height: int, tag: int, quiet: int, dpi: int) -> 
 
 
 def place_tags(
-    width: int, height: int, top: int, tag: int, quiet: int, rows: int, cols: int,
+    width: int, height: int, top: int, tag: int, quiet: int, rows: int, cols: int, cell: int,
 ) -> tuple[TagMark, ...]:
     xs = _centers(width, cols, tag, quiet)
     ys = _centers(height, rows, tag, quiet)
@@ -36,11 +36,32 @@ def place_tags(
                 tag_id=row * cols + col,
                 row=row,
                 col=col,
-                x=int(round(cx - tag / 2)),
-                y=int(round(top + cy - tag / 2)),
+                x=_align_origin(cx, tag, quiet, width, cell),
+                y=_align_origin(top + cy, tag, quiet, top + height, cell),
                 size=tag,
             ))
     return tuple(marks)
+
+
+def _align_origin(center: float, size: int, quiet: int, limit: int, cell: int) -> int:
+    raw = int(round(center - size / 2))
+    if cell <= 1:
+        return raw
+    edge = raw - quiet
+    down = (edge // cell) * cell
+    best_edge = edge
+    best_dist = cell + 1
+    for base in (down, down + cell):
+        origin = base + quiet
+        if origin < 0 or origin + size > limit:
+            continue
+        dist = abs(base - edge)
+        if dist < best_dist or (dist == best_dist and base < best_edge):
+            best_edge = base
+            best_dist = dist
+    if best_dist > cell:
+        return raw
+    return best_edge + quiet
 
 
 def _fit_count(count: int, length: int, tag: int, quiet: int) -> int:
