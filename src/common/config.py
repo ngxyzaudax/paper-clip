@@ -1,6 +1,13 @@
 from dataclasses import dataclass, fields, replace
 
-from common.format_spec import BLOCK_SIZE, DEFAULT_MARGIN_MM, MIN_CELL_MM
+from common.format_spec import (
+    BLOCK_SIZE,
+    DEFAULT_MARGIN_MM,
+    MIN_CELL_MM,
+    TAG_PITCH_MAX_MM,
+    TAG_PITCH_MIN_MM,
+    TAG_TARGET_PITCH_MM,
+)
 
 MARGIN_MM = DEFAULT_MARGIN_MM
 
@@ -11,6 +18,7 @@ class PaperClipConfig:
     cell_size_px: int = 32
     print_dpi: int = 720
     rs_redundancy: float = 0.45
+    tag_pitch_mm: float = TAG_TARGET_PITCH_MM
     redundancy_pages: int = 0
     page_width_mm: float = 210.0
     page_height_mm: float = 297.0
@@ -29,6 +37,10 @@ def validate_config(config: PaperClipConfig) -> PaperClipConfig:
         raise ValueError("print_dpi must be at least 300")
     if config.rs_redundancy < 0.05 or config.rs_redundancy > 0.50:
         raise ValueError("rs_redundancy must be between 0.05 and 0.50")
+    if config.tag_pitch_mm < TAG_PITCH_MIN_MM or config.tag_pitch_mm > TAG_PITCH_MAX_MM:
+        raise ValueError(
+            f"tag_pitch_mm must be between {TAG_PITCH_MIN_MM:.0f} and {TAG_PITCH_MAX_MM:.0f}"
+        )
     if config.redundancy_pages < 0:
         raise ValueError("redundancy_pages must be non-negative")
     if config.page_width_mm <= 0 or config.page_height_mm <= 0:
@@ -59,6 +71,7 @@ ALGO_FIELDS = (
     "cell_size_px",
     "print_dpi",
     "rs_redundancy",
+    "tag_pitch_mm",
     "redundancy_pages",
 )
 

@@ -25,6 +25,7 @@ def _geometry_key(config: PaperClipConfig) -> tuple[float | int, ...]:
         config.num_symbols,
         config.cell_size_px,
         config.print_dpi,
+        int(round(config.tag_pitch_mm)),
         quantize_mm(config.page_width_mm),
         quantize_mm(config.page_height_mm),
         quantize_mm(config.margin_top_mm),
@@ -36,7 +37,7 @@ def _geometry_key(config: PaperClipConfig) -> tuple[float | int, ...]:
 
 @lru_cache(maxsize=64)
 def _page_geometry_cached(key: tuple[float | int, ...]) -> PageGeometry:
-    symbols, cell, dpi, page_w_mm, page_h_mm, top, right, bottom, left = key
+    symbols, cell, dpi, pitch_mm, page_w_mm, page_h_mm, top, right, bottom, left = key
     page_w = mm_to_px(float(page_w_mm), int(dpi))
     page_h = mm_to_px(float(page_h_mm), int(dpi))
     origin_x = margin_px(float(left), int(dpi), int(cell))
@@ -51,7 +52,7 @@ def _page_geometry_cached(key: tuple[float | int, ...]) -> PageGeometry:
     tag = tag_pixel_size(int(dpi))
     quiet = tag_quiet_px(int(dpi))
     data_h = usable_h - header_h
-    tag_rows, tag_cols = choose_tag_grid(usable_w, data_h, tag, quiet, int(dpi))
+    tag_rows, tag_cols = choose_tag_grid(usable_w, data_h, tag, quiet, int(dpi), float(pitch_mm))
     tags = place_tags(usable_w, data_h, header_h, tag, quiet, tag_rows, tag_cols, int(cell))
     forbidden = _forbidden(usable_w, usable_h, header_h, tags, quiet)
     return PageGeometry(

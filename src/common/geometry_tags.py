@@ -1,4 +1,4 @@
-from common.format_spec import TAG_QUIET_MM, TAG_SIZE_MM, TAG_TARGET_PITCH_MM
+from common.format_spec import TAG_QUIET_MM, TAG_SIZE_MM
 from common.geometry_measure import mm_to_px
 from common.geometry_types import TagMark
 
@@ -13,8 +13,10 @@ def tag_quiet_px(dpi: int) -> int:
     return max(8, mm_to_px(TAG_QUIET_MM, dpi))
 
 
-def choose_tag_grid(width: int, height: int, tag: int, quiet: int, dpi: int) -> tuple[int, int]:
-    pitch = max(tag + 2 * quiet, mm_to_px(TAG_TARGET_PITCH_MM, dpi))
+def choose_tag_grid(
+    width: int, height: int, tag: int, quiet: int, dpi: int, pitch_mm: float,
+) -> tuple[int, int]:
+    pitch = max(tag + 2 * quiet, mm_to_px(pitch_mm, dpi))
     cols = max(2, min(5, max(1, width // pitch)))
     rows = max(2, min(6, max(1, height // pitch)))
     cols = _fit_count(cols, width, tag, quiet)

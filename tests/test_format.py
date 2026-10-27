@@ -1,9 +1,10 @@
 import base64
+from dataclasses import replace
 
 import pytest
 
 from common.codec import calculate_ecc_symbols
-from common.config import BLOCK_SIZE, default_config, resolve_config
+from common.config import BLOCK_SIZE, default_config, resolve_config, validate_config
 from common.drawing import dot_radius_px
 from common.format_spec import HEADER_BODY, HEADER_STRUCT
 from common.geometry import page_geometry
@@ -26,7 +27,7 @@ def test_header_roundtrip_carries_length_dpi_and_hash() -> None:
         prepared.original_sha256, prepared.flags,
     )
     header = decode_header_bytes(blob)
-    assert header.format_version == 3
+    assert header.tag_pitch_mm == 16
     assert header.print_dpi == 360
     assert header.cell_size_px == 18
     assert header.margin_left_mm == 10
@@ -64,6 +65,16 @@ def test_small_test_page_has_capacity() -> None:
     geometry = page_geometry(config)
     assert len(geometry.tags) >= 4
     assert data_capacity_bytes(config) > 200
+
+
+def test_header_pitch_sets_the_tag_mesh() -> None:
+    base = resolve_config(
+        paper_size="A6", print_dpi=360, cell_size_px=18, margin_mm=10, num_symbols=5,
+    )
+    wide = validate_config(replace(base, tag_pitch_mm=32))
+    assert len(page_geometry(wide).tags) < len(page_geometry(base).tags)
+    blob = encode_header_bytes(wide, 0, 1, 1, 240, 4, b"\x00" * 32, 0)
+    assert decode_header_bytes(blob).tag_pitch_mm == 32
 
 
 def test_a6_sweep_page_has_more_tags_than_3x3() -> None:

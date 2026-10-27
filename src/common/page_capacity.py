@@ -3,7 +3,7 @@ from functools import lru_cache
 
 from common.config import PaperClipConfig
 from common.geometry import page_geometry
-from common.layout_spatial import count_valid_cells_row_major, valid_cells_row_major
+from common.valid_cells import count_valid_cells_row_major, valid_cells_row_major
 from common.symbols import chunk_params
 
 

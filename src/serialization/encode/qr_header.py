@@ -10,7 +10,6 @@ from common.codec import calculate_ecc_symbols
 from common.config import BLOCK_SIZE, PaperClipConfig
 from common.format_spec import (
     HEADER_BODY,
-    HEADER_FORMAT_VERSION,
     HEADER_STRUCT,
     MAGIC,
     QR_BORDER_MODULES,
@@ -22,7 +21,7 @@ from common.page_layout import grid_dimensions, margin_offset, qr_region
 
 
 class DecodedQrHeader(NamedTuple):
-    format_version: int
+    tag_pitch_mm: int
     flags: int
     num_symbols: int
     cell_size_px: int
@@ -57,7 +56,7 @@ def encode_header_bytes(
     cols, rows = grid_dimensions(config)
     body = HEADER_BODY.pack(
         MAGIC,
-        HEADER_FORMAT_VERSION,
+        int(round(config.tag_pitch_mm)),
         flags,
         config.num_symbols,
         config.cell_size_px,
@@ -91,10 +90,8 @@ def decode_header_bytes(blob: bytes) -> DecodedQrHeader:
         raise ValueError("invalid header magic")
     if (zlib.crc32(blob[:-4]) & 0xFFFFFFFF) != crc:
         raise ValueError("invalid header crc")
-    if unpacked[1] != HEADER_FORMAT_VERSION:
-        raise ValueError(f"unsupported format version {unpacked[1]}")
     return DecodedQrHeader(
-        format_version=unpacked[1],
+        tag_pitch_mm=unpacked[1],
         flags=unpacked[2],
         num_symbols=unpacked[3],
         cell_size_px=unpacked[4],

@@ -35,6 +35,7 @@ def show_encoding_plan(
         ("Cell size", f"{config.cell_size_px} px"),
         ("Bits/cell", f"{bpc:.2f}"),
         ("Grid", f"{cols} x {rows} cells"),
+        ("Tag pitch", f"{config.tag_pitch_mm:.0f} mm"),
         ("Page image", f"{pw} x {ph} px"),
         ("RS redundancy", f"{config.rs_redundancy:.0%}"),
     ], title="Encoding Configuration")
