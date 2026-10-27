@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 
 _BENDS = (0.0, -0.02, 0.02, -0.04, 0.04, -0.06, 0.06)
-_PAD = 0.35
+_PAD = 0.6
 
 type Decode = Callable[[str], object | None]
 
