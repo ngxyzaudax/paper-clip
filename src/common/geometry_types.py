@@ -25,8 +25,10 @@ class PageGeometry(NamedTuple):
     qr: Region
     calibration: Region
     cal_rows: int
-    header_h: int
+    centre: Region
     tags: tuple[TagMark, ...]
     tag_rows: int
     tag_cols: int
+    tag_xs: tuple[float, ...]
+    tag_ys: tuple[float, ...]
     forbidden: tuple[tuple[int, int, int, int], ...]

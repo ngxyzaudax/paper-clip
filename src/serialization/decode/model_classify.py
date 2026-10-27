@@ -22,11 +22,16 @@ def model_cell_grid(
     probs = exp / np.sum(exp, axis=-1, keepdims=True)
     symbols = np.argmax(probs, axis=-1).astype(np.int32)
     confidence = np.max(probs, axis=-1).astype(np.float32)
-    mean_offset = None
-    if offset is not None:
-        data_row = min(geometry.header_h // geometry.cell, max(0, offset.shape[1] - 1))
-        mean_offset = np.mean(offset[0, data_row:], axis=(0, 1)).astype(np.float32)
-    return symbols, confidence, mean_offset
+    return symbols, confidence, None if offset is None else offset[0].astype(np.float32)
+
+
+def mean_cell_offset(offset: np.ndarray, cells: list[tuple[int, int]]) -> np.ndarray | None:
+    inside = [(row, col) for row, col in cells if row < offset.shape[0] and col < offset.shape[1]]
+    if not inside:
+        return None
+    rows = np.fromiter((row for row, _ in inside), np.int64, len(inside))
+    cols = np.fromiter((col for _, col in inside), np.int64, len(inside))
+    return np.mean(offset[rows, cols], axis=0).astype(np.float32)
 
 
 def _forward(model: object, batch: np.ndarray) -> tuple[np.ndarray, np.ndarray | None]:

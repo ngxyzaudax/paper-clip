@@ -52,7 +52,8 @@ def test_default_page_fits_tags_margin_and_cell() -> None:
     geometry = page_geometry(config)
     margin_mm = geometry.origin_x * 25.4 / config.print_dpi
     cell_mm = config.cell_size_px * 25.4 / config.print_dpi
-    assert margin_mm >= 12
+    assert config.margin_left_mm == 5
+    assert margin_mm >= 5
     assert cell_mm >= 0.6
     assert len(geometry.tags) >= 8
     assert geometry.tag_rows >= 2 and geometry.tag_cols >= 2

@@ -2,7 +2,8 @@ import cv2
 import numpy as np
 
 from common.geometry import PageGeometry, tag_center_xy
-from serialization.decode.warp_math import project, quad_area, warp_global
+from serialization.decode.warp_local import local_source
+from serialization.decode.warp_math import project, quad_area, vstack, warp_global
 
 
 def warp_piecewise(
@@ -10,12 +11,13 @@ def warp_piecewise(
     geometry: PageGeometry,
     detected: dict[int, np.ndarray],
     matrix: np.ndarray,
+    anchors: tuple[np.ndarray, np.ndarray],
 ) -> np.ndarray:
     try:
         inverse = np.linalg.inv(matrix)
     except np.linalg.LinAlgError:
         return warp_global(image, matrix, geometry.page_w, geometry.page_h)
-    dest, src = _mesh(geometry, detected, inverse)
+    dest, src = _mesh(geometry, detected, inverse, anchors)
     canvas = np.full((geometry.page_h, geometry.page_w, 3), 255, np.uint8)
     filled = np.zeros((geometry.page_h, geometry.page_w), np.uint8)
     rows, cols = dest.shape[:2]
@@ -30,27 +32,42 @@ def warp_piecewise(
 
 
 def _mesh(
-    geometry: PageGeometry, detected: dict[int, np.ndarray], inverse: np.ndarray,
+    geometry: PageGeometry,
+    detected: dict[int, np.ndarray],
+    inverse: np.ndarray,
+    anchors: tuple[np.ndarray, np.ndarray],
 ) -> tuple[np.ndarray, np.ndarray]:
-    xs = [0.0, *_centers(geometry, "x"), float(geometry.page_w - 1)]
-    ys = [0.0, *_centers(geometry, "y"), float(geometry.page_h - 1)]
+    xs = [0.0, *geometry.tag_xs, float(geometry.page_w - 1)]
+    ys = [0.0, *geometry.tag_ys, float(geometry.page_h - 1)]
+    placed = {(tag.row, tag.col): tag_center_xy(geometry, tag) for tag in geometry.tags}
+    ideal, observed = _known_points(geometry, detected, anchors)
+    limit = _node_limit(geometry)
     dest = np.zeros((len(ys), len(xs), 2), np.float32)
     src = np.zeros_like(dest)
     for row, y in enumerate(ys):
         for col, x in enumerate(xs):
-            point = np.array([x, y], np.float32)
+            point = np.array(placed.get((row - 1, col - 1), (x, y)), np.float32)
             dest[row, col] = point
-            src[row, col] = _node_source(geometry, detected, inverse, row - 1, col - 1, point)
+            src[row, col] = _node_source(geometry, detected, inverse, row - 1, col - 1, point, ideal, observed, limit)
     return dest, src
 
 
-def _centers(geometry: PageGeometry, axis: str) -> list[float]:
-    count = geometry.tag_cols if axis == "x" else geometry.tag_rows
-    values = [0.0] * count
-    for tag in geometry.tags:
-        center = tag_center_xy(geometry, tag)
-        values[tag.col if axis == "x" else tag.row] = center[0 if axis == "x" else 1]
-    return values
+def _known_points(
+    geometry: PageGeometry,
+    detected: dict[int, np.ndarray],
+    anchors: tuple[np.ndarray, np.ndarray],
+) -> tuple[np.ndarray, np.ndarray]:
+    found = [tag for tag in geometry.tags if tag.tag_id in detected]
+    ideal = np.array([tag_center_xy(geometry, tag) for tag in found], np.float32).reshape(-1, 2)
+    observed = np.array([detected[tag.tag_id] for tag in found], np.float32).reshape(-1, 2)
+    anchor_observed, anchor_ideal = anchors
+    return vstack(ideal, anchor_ideal), vstack(observed, anchor_observed)
+
+
+def _node_limit(geometry: PageGeometry) -> float:
+    pitches = [b - a for a, b in zip(geometry.tag_xs, geometry.tag_xs[1:])]
+    pitches += [b - a for a, b in zip(geometry.tag_ys, geometry.tag_ys[1:])]
+    return 0.5 * min(pitches) if pitches else float(geometry.cell)
 
 
 def _node_source(
@@ -60,11 +77,15 @@ def _node_source(
     tag_row: int,
     tag_col: int,
     dest: np.ndarray,
+    ideal: np.ndarray,
+    observed: np.ndarray,
+    limit: float,
 ) -> np.ndarray:
     if 0 <= tag_row < geometry.tag_rows and 0 <= tag_col < geometry.tag_cols:
         tag_id = tag_row * geometry.tag_cols + tag_col
         if tag_id in detected:
             return np.asarray(detected[tag_id], np.float32)
+        return local_source(ideal, observed, dest, inverse, limit)
     return project(inverse, dest)
 
 

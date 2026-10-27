@@ -6,6 +6,7 @@ import cv2
 import numpy as np
 
 from serialization.decode.errors import DecodeError
+from serialization.decode.qr_bend import bent_qr_retry
 from serialization.encode.qr_header import DecodedQrHeader, decode_header_bytes
 
 
@@ -19,6 +20,10 @@ def read_qr_header(image: np.ndarray) -> tuple[np.ndarray, DecodedQrHeader, np.n
                 if header is None:
                     continue
                 return rotated, header, points
+    rescued = bent_qr_retry(image, detectors, _header_from_text)
+    if rescued is not None:
+        header, points = rescued
+        return image, header, points
     raise DecodeError("QR header not found")
 
 

@@ -27,7 +27,7 @@ def choose_tag_grid(
 
 
 def place_tags(
-    width: int, height: int, top: int, tag: int, quiet: int, rows: int, cols: int, cell: int,
+    width: int, height: int, tag: int, quiet: int, rows: int, cols: int, cell: int,
 ) -> tuple[TagMark, ...]:
     xs = _centers(width, cols, tag, quiet)
     ys = _centers(height, rows, tag, quiet)
@@ -39,7 +39,7 @@ def place_tags(
                 row=row,
                 col=col,
                 x=_align_origin(cx, tag, quiet, width, cell),
-                y=_align_origin(top + cy, tag, quiet, top + height, cell),
+                y=_align_origin(cy, tag, quiet, height, cell),
                 size=tag,
             ))
     return tuple(marks)

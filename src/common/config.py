@@ -4,6 +4,7 @@ from common.format_spec import (
     BLOCK_SIZE,
     DEFAULT_MARGIN_MM,
     MIN_CELL_MM,
+    MIN_MARGIN_MM,
     TAG_PITCH_MAX_MM,
     TAG_PITCH_MIN_MM,
     TAG_TARGET_PITCH_MM,
@@ -46,8 +47,10 @@ def validate_config(config: PaperClipConfig) -> PaperClipConfig:
     if config.page_width_mm <= 0 or config.page_height_mm <= 0:
         raise ValueError("page dimensions must be positive")
     for name in ("margin_top_mm", "margin_right_mm", "margin_bottom_mm", "margin_left_mm"):
-        if getattr(config, name) < 0:
-            raise ValueError(f"{name} must be non-negative")
+        if getattr(config, name) < MIN_MARGIN_MM:
+            raise ValueError(
+                f"{name} must be at least {MIN_MARGIN_MM:g} mm; paper-clip pages are never printed borderless"
+            )
     usable_w = config.page_width_mm - config.margin_left_mm - config.margin_right_mm
     usable_h = config.page_height_mm - config.margin_top_mm - config.margin_bottom_mm
     if usable_w <= 0 or usable_h <= 0:

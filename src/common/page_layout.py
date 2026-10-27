@@ -35,10 +35,6 @@ def qr_region(config: PaperClipConfig) -> Region:
     return page_geometry(config).qr
 
 
-def strip_height_px(config: PaperClipConfig) -> int:
-    return page_geometry(config).header_h
-
-
 def alignment_tag_placements(config: PaperClipConfig) -> list[tuple[int, int, int, int]]:
     return [(tag.x, tag.y, tag.tag_id, tag.size) for tag in page_geometry(config).tags]
 
@@ -54,7 +50,6 @@ __all__ = (
     "page_image_size",
     "pages_needed",
     "qr_region",
-    "strip_height_px",
     "usable_area_px",
     "valid_cells_ordered",
 )

@@ -19,9 +19,10 @@ def classify_cells(
 ) -> tuple[list[int], list[float]]:
     shift_x, shift_y = dx, dy
     if model is not None:
-        from serialization.decode.model_classify import model_cell_grid
+        from serialization.decode.model_classify import mean_cell_offset, model_cell_grid
 
-        predicted, predicted_conf, offset = model_cell_grid(model, image, geometry, config.num_symbols)
+        predicted, predicted_conf, offset_map = model_cell_grid(model, image, geometry, config.num_symbols)
+        offset = None if offset_map is None else mean_cell_offset(offset_map, cells)
         if offset is not None:
             shift_x += int(round(float(offset[0]) * geometry.cell))
             shift_y += int(round(float(offset[1]) * geometry.cell))

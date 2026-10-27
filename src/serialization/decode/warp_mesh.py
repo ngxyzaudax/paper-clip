@@ -17,8 +17,10 @@ def warp_page(
     src, dst = _tag_pairs(geometry, detected)
     border = _corner_pairs(geometry, detected)
     bsrc, bdst = (src, dst) if border is None else border
+    anchors = (np.zeros((0, 2), np.float32), np.zeros((0, 2), np.float32))
     if qr_points is not None and len(qr_points) == 4 and len(bsrc) >= 4:
-        bsrc, bdst = _match_qr(bsrc, bdst, qr_points, geometry)
+        anchors = _match_qr(bsrc, bdst, qr_points, geometry)
+        bsrc, bdst = vstack(bsrc, anchors[0]), vstack(bdst, anchors[1])
     elif qr_points is not None and len(qr_points) == 4 and len(src) < 4:
         src, dst = vstack(src, order_quad(qr_points)), vstack(dst, qr_code_corners(geometry))
         bsrc, bdst = src, dst
@@ -26,7 +28,7 @@ def warp_page(
         raise DecodeError(f"only {len(detected)} alignment tags found; need at least 4")
     matrix = homography(bsrc, bdst)
     if len(detected) >= 4:
-        return warp_piecewise(image, geometry, detected, matrix)
+        return warp_piecewise(image, geometry, detected, matrix, anchors)
     return warp_global(image, matrix, geometry.page_w, geometry.page_h)
 
 
@@ -67,10 +69,11 @@ def _corner_pairs(
 def _match_qr(
     src: np.ndarray, dst: np.ndarray, qr_points: np.ndarray, geometry: PageGeometry,
 ) -> tuple[np.ndarray, np.ndarray]:
+    empty = (np.zeros((0, 2), np.float32), np.zeros((0, 2), np.float32))
     try:
         inverse = np.linalg.inv(homography(src, dst))
     except np.linalg.LinAlgError:
-        return src, dst
+        return empty
     ideal = qr_code_corners(geometry)
     projected = np.stack([project(inverse, point) for point in ideal])
     used: set[int] = set()
@@ -85,5 +88,5 @@ def _match_qr(
         extra_src.append(qr_points[index])
         extra_dst.append(dest)
     if len(extra_src) < 4:
-        return src, dst
-    return vstack(src, np.stack(extra_src)), vstack(dst, np.stack(extra_dst))
+        return empty
+    return np.stack(extra_src).astype(np.float32), np.stack(extra_dst).astype(np.float32)
