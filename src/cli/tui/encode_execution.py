@@ -26,9 +26,10 @@ def run_tui_encode_job(
     on_page_complete: Callable[[int, int, Path | None], None],
 ) -> tuple[str, list[Path]]:
     raw_data = input_path.read_bytes()
-    payload, sha256_hash = prepare_payload(
+    prepared = prepare_payload(
         raw_data, config, filename=input_path.name, passphrase=passphrase,
     )
+    payload = prepared.payload
     data_pages = pages_needed(len(payload), config)
     total_pages = data_pages + config.redundancy_pages
     config_dict = {k: getattr(config, k) for k in ALGO_FIELDS}
@@ -52,6 +53,6 @@ def run_tui_encode_job(
     png_paths = encode(
         input_path, output_base, config,
         on_page_complete=on_page_complete, passphrase=passphrase,
-        cached_payload_hash=(payload, sha256_hash),
+        prepared=prepared,
     )
     return str(job_dir), png_paths

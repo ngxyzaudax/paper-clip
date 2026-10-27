@@ -1,52 +1,15 @@
-import struct
-from dataclasses import dataclass
+from dataclasses import dataclass, fields, replace
 
-from common.cell_size_picks import validate_cell_size_pick
+from common.format_spec import BLOCK_SIZE, DEFAULT_MARGIN_MM, MIN_CELL_MM
 
-
-MAGIC = b"PCLP"
-HEADER_FORMAT_VERSION = 1
-MARGIN_MM = 0.0
-
-BLOCK_SIZE = 200
-TIMING_TRACK_WIDTH = 1
-DOWNSCALE_MAX_DIM = 4000
-APRILTAG_FAMILY = "tag36h11"
-
-LAYOUT_CLEARANCE_DIVISOR = 200
-FIDUCIAL_DPI = 300
-APRILTAG_MESH_N = 5
-APRILTAG_EDGE_CELLS = 9
-APRILTAG_36H11_ID_COUNT = 587
-
-QR_MODULE_PX = 12
-QR_BORDER_MODULES = 2
-QR_VERSION = 5
-
-
-def qr_image_size_px() -> int:
-    modules_per_side = 17 + 4 * QR_VERSION
-    return (modules_per_side + 2 * QR_BORDER_MODULES) * QR_MODULE_PX
-
-
-def center_sample_half(cell_size_px: int) -> int:
-    return max(1, cell_size_px // 8)
-
-
-def layout_clearance_px(print_dpi: int) -> int:
-    return max(3, print_dpi // LAYOUT_CLEARANCE_DIVISOR)
-
-PAYLOAD_HEADER_REDUNDANCY = 3
-
-HEADER_STRUCT = struct.Struct(">4sBBBBHHHHH32sI")
-PAYLOAD_HEADER_STRUCT = struct.Struct(">IHB")
+MARGIN_MM = DEFAULT_MARGIN_MM
 
 
 @dataclass(frozen=True)
 class PaperClipConfig:
     num_symbols: int = 5
-    cell_size_px: int = 10
-    print_dpi: int = 1200
+    cell_size_px: int = 32
+    print_dpi: int = 720
     rs_redundancy: float = 0.20
     redundancy_pages: int = 0
     page_width_mm: float = 210.0
@@ -61,7 +24,7 @@ def validate_config(config: PaperClipConfig) -> PaperClipConfig:
     from common.color_picker import validate_print_symbol_count
 
     validate_print_symbol_count(config.num_symbols)
-    validate_cell_size_pick(config.cell_size_px)
+    _validate_cell(config)
     if config.print_dpi < 300:
         raise ValueError("print_dpi must be at least 300")
     if config.rs_redundancy < 0.05 or config.rs_redundancy > 0.50:
@@ -70,19 +33,25 @@ def validate_config(config: PaperClipConfig) -> PaperClipConfig:
         raise ValueError("redundancy_pages must be non-negative")
     if config.page_width_mm <= 0 or config.page_height_mm <= 0:
         raise ValueError("page dimensions must be positive")
-    for name in (
-        "margin_top_mm",
-        "margin_right_mm",
-        "margin_bottom_mm",
-        "margin_left_mm",
-    ):
+    for name in ("margin_top_mm", "margin_right_mm", "margin_bottom_mm", "margin_left_mm"):
         if getattr(config, name) < 0:
             raise ValueError(f"{name} must be non-negative")
-    tw = config.page_width_mm - config.margin_left_mm - config.margin_right_mm
-    th = config.page_height_mm - config.margin_top_mm - config.margin_bottom_mm
-    if tw <= 0 or th <= 0:
+    usable_w = config.page_width_mm - config.margin_left_mm - config.margin_right_mm
+    usable_h = config.page_height_mm - config.margin_top_mm - config.margin_bottom_mm
+    if usable_w <= 0 or usable_h <= 0:
         raise ValueError("page margins leave no usable area")
     return config
+
+
+def _validate_cell(config: PaperClipConfig) -> None:
+    px = config.cell_size_px
+    if px < 8 or px > 160:
+        raise ValueError(f"cell_size_px must be between 8 and 160; got {px}")
+    mm = px * 25.4 / config.print_dpi
+    if mm < MIN_CELL_MM:
+        raise ValueError(
+            f"cell size {mm:.3f} mm is below the {MIN_CELL_MM} mm minimum at {config.print_dpi} dpi"
+        )
 
 
 ALGO_FIELDS = (
@@ -111,33 +80,31 @@ def resolve_config(
     margin_bottom_mm: float | None = None,
     margin_left_mm: float | None = None,
 ) -> PaperClipConfig:
-    from dataclasses import replace
-
     base = default_config()
     overrides: dict[str, object] = {
-        k: v
-        for k, v in [
+        key: value
+        for key, value in (
             ("num_symbols", num_symbols),
             ("cell_size_px", cell_size_px),
             ("print_dpi", print_dpi),
             ("rs_redundancy", rs_redundancy),
             ("redundancy_pages", redundancy_pages),
-        ]
-        if v is not None
+        )
+        if value is not None
     }
     if margin_mm is not None:
         overrides["margin_top_mm"] = margin_mm
         overrides["margin_right_mm"] = margin_mm
         overrides["margin_bottom_mm"] = margin_mm
         overrides["margin_left_mm"] = margin_mm
-    for k, v in [
+    for key, value in (
         ("margin_top_mm", margin_top_mm),
         ("margin_right_mm", margin_right_mm),
         ("margin_bottom_mm", margin_bottom_mm),
         ("margin_left_mm", margin_left_mm),
-    ]:
-        if v is not None:
-            overrides[k] = v
+    ):
+        if value is not None:
+            overrides[key] = value
     if paper_size:
         from common.paper_sizes import config_with_page_dimensions
         base = config_with_page_dimensions(base, paper_size)
@@ -145,11 +112,9 @@ def resolve_config(
 
 
 def config_from_job_dict(stored: dict) -> PaperClipConfig:
-    from dataclasses import fields
-
     base = default_config()
-    d: dict[str, object] = {f.name: getattr(base, f.name) for f in fields(PaperClipConfig)}
-    for name in d:
+    values: dict[str, object] = {item.name: getattr(base, item.name) for item in fields(PaperClipConfig)}
+    for name in values:
         if name in stored:
-            d[name] = stored[name]
-    return validate_config(PaperClipConfig(**d))
+            values[name] = stored[name]
+    return validate_config(PaperClipConfig(**values))

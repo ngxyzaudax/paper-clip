@@ -20,6 +20,7 @@ dependencies = [
     "qrcode>=8.2",
     "argon2-cffi>=25.1.0",
     "cryptography>=46.0.6",
+    "tensorflow>=2.21.0",
 ]
 
 [project.optional-dependencies]
@@ -36,3 +37,15 @@ where = ["src"]
 
 [tool.setuptools.package-dir]
 "" = "src"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-m 'not slow'"
+markers = [
+    "slow: heavier sweeps and neural-net checks",
+]

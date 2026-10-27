@@ -1,9 +1,5 @@
-from common.config import (
-    APRILTAG_EDGE_CELLS,
-    FIDUCIAL_DPI,
-    PaperClipConfig,
-    layout_clearance_px,
-)
+from common.config import PaperClipConfig
+from common.legacy_layout import APRILTAG_EDGE_CELLS, FIDUCIAL_DPI, layout_clearance_px
 from common.layout_spatial import (
     UsableLayout,
     build_usable_layout,

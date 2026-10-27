@@ -1,4 +1,4 @@
-CELL_SIZE_PICK_VALUES: tuple[int, ...] = (10, 15, 20, 25)
+CELL_SIZE_PICK_VALUES: tuple[int, ...] = (24, 32, 40, 48, 64)
 CELL_SIZE_PICK_MIN = CELL_SIZE_PICK_VALUES[0]
 CELL_SIZE_PICK_MAX = CELL_SIZE_PICK_VALUES[-1]
 
@@ -19,8 +19,8 @@ def validate_cell_size_pick(px: int) -> int:
 
 
 def clamp_cell_size_pick(px: int) -> int:
-    b: int = max(CELL_SIZE_PICK_MIN, min(CELL_SIZE_PICK_MAX, px))
-    return _nearest_cell_size_pick(b)
+    bounded = max(CELL_SIZE_PICK_MIN, min(CELL_SIZE_PICK_MAX, px))
+    return _nearest_cell_size_pick(bounded)
 
 
 def cell_size_pick_label(px: int) -> str:

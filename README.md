@@ -54,6 +54,7 @@ From the repository root:
 | Command | Purpose |
 |---------|---------|
 | `encode` | File → PNG page(s) (same workflow as **Encode File** in the TUI) |
+| `decode` | Scanned PNG/JPEG/TIFF, a directory, or a scan job → original file |
 | `devices` | Scanner / printer discovery and defaults (same as **Devices** in the TUI) |
 
 Use `uv run paper-clip <command> --help` for flags, or run `paper-clip` with no arguments for the TUI.
@@ -67,7 +68,13 @@ Use `uv run paper-clip <command> --help` for flags, or run `paper-clip` with no 
 | `src/main.py` | Logging and Typer entry |
 | `src/cli/` | Commands, Rich output, `cli/tui/` screens |
 | `src/common/` | Config, codec, compression, crypto, CUPS/SANE, layouts, types |
-| `src/serialization/encode/` | Encoder, pipeline, rendering, parity pages |
+| `src/serialization/encode/` | Format v2 encoder, QR header, calibration strip, tag grid |
+| `src/serialization/decode/` | QR, AprilTag mesh dewarp, cell classification, RS, decrypt |
+| `src/ml/` | TensorFlow 2 cell decoder, synthetic trainer, saved-model loading |
+| `src/scan_sim/` | Shared print/scan augmentation used by tests and training |
+| `models/cell_decoder.keras` | Synthetic cell decoder shipped with the repo |
+| `scripts/sweep_decode.py` | Heavier decode success-rate sweep |
+| `tests/` | Fast pytest subset (`pytest`, skips `slow`) |
 
 Runtime data lives under **`data/`**, mainly `jobs/` (`digital/`, `scans/`, etc.).
 
@@ -75,13 +82,15 @@ Runtime data lives under **`data/`**, mainly `jobs/` (`digital/`, `scans/`, etc.
 
 ## How the format works
 
-1. **Payload:** SHA-256 hash, **Zstandard** compression, optional **Argon2id + AES-GCM** encryption, **Reed–Solomon** on blocks with **interleaving**, plus a small repeated payload header (lengths, filename).
+Format version is **2**. Defaults target an Epson ET-8500 used with Epson’s own driver at about **720 dpi**: **12 mm** margins, **32 px** cells (about 1.13 mm), and a **5-symbol** alphabet. Cell size, alphabet (5, 8, or 11), and dpi are configurable. Cells must be at least **0.6 mm**.
 
-2. **Symbols:** Bytes map to a multi-level alphabet (`num_colors`); more than one bit per cell when `num_colors` > 2 (`common/symbols.py`).
+1. **Payload:** Zstandard, then Argon2id + AES-GCM (a built-in key when no passphrase is given). Filename, blob length, and block count are repeated inside the Reed–Solomon stream. The QR header stores dpi, margins, page size, the interleaved payload length, and the SHA-256 and length of the **original file**.
 
-3. **Pages:** PNG at `print_dpi` with finders/alignment, **QR** header, optional **palette QR**, calibration bar, timing tracks, and the data grid (`serialization/encode/renderer.py`).
+2. **Page:** A version-10 QR code drawn on its module grid, a calibration strip of the symbol colours, an AprilTag 36h11 grid for a mesh dewarp, and gapped colour dots. Tags are pasted last so they keep a quiet zone.
 
-4. **Parity:** Extra pages from RS across pages can recover missing data pages when `redundancy_pages` > 0 (`common/fountain.py`).
+3. **Decode:** `paper-clip decode` loads a scan, reads the QR header, finds the tag grid, dewarps with a piecewise mesh (global homography if only a few tags are visible), samples cells, and classifies them. A saved TensorFlow 2 network is used when `models/cell_decoder.keras` is present; otherwise, or with `--no-model`, classification is nearest-colour in Lab against the calibration strip. Low confidence becomes Reed–Solomon erasures. Then decrypt, decompress, reassemble, and check the original SHA-256. Extra parity pages can rebuild a missing page.
+
+4. **Tests:** `uv run pytest` runs the fast suite. `uv run python scripts/sweep_decode.py` reports decode success across augmentation strengths. `uv run python scripts/train_cell_decoder.py` retrains the cell decoder on the same photometric and ink model.
 
 ---
 

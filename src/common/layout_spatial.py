@@ -1,6 +1,6 @@
 from typing import NamedTuple
 
-from common.config import FIDUCIAL_DPI
+from common.legacy_layout import FIDUCIAL_DPI
 
 
 def print_px_to_fiducial_px(px: int, print_dpi: int, fiducial_dpi: int) -> int:

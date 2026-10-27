@@ -1,4 +1,4 @@
-POPULAR_PRINT_DPIS: tuple[int, ...] = (300, 400, 600, 1200, 1440, 2400, 4800)
+POPULAR_PRINT_DPIS: tuple[int, ...] = (300, 360, 600, 720, 1200, 1440, 2400)
 
 
 def closest_popular_print_dpi(dpi: int) -> int:

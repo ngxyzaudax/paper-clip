@@ -1,4 +1,4 @@
-from common.config import APRILTAG_36H11_ID_COUNT, APRILTAG_MESH_N
+from common.legacy_layout import APRILTAG_36H11_ID_COUNT, APRILTAG_MESH_N
 from common.layout_spatial import UsableLayout, tag_paste_top_left
 
 

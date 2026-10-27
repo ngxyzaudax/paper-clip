@@ -2,43 +2,38 @@ import math
 from functools import lru_cache
 
 from common.config import PaperClipConfig
-from common.layout_metrics import layout_forbidden_rects, usable_area_px
+from common.geometry import page_geometry
 from common.layout_spatial import count_valid_cells_row_major, valid_cells_row_major
 from common.symbols import chunk_params
 
 
 def grid_dimensions(config: PaperClipConfig) -> tuple[int, int]:
-    uw, uh = usable_area_px(config)
-    cell = config.cell_size_px
-    cols = uw // cell
-    rows = uh // cell
-    return cols, rows
+    geometry = page_geometry(config)
+    return geometry.cols, geometry.rows
 
 
 @lru_cache(maxsize=128)
 def data_capacity_symbols(config: PaperClipConfig) -> int:
-    cols, rows = grid_dimensions(config)
-    cell = config.cell_size_px
+    geometry = page_geometry(config)
     return count_valid_cells_row_major(
-        cols, rows, cell, layout_forbidden_rects(config),
+        geometry.cols, geometry.rows, geometry.cell, list(geometry.forbidden),
     )
 
 
 @lru_cache(maxsize=32)
 def valid_cells_ordered(config: PaperClipConfig) -> list[tuple[int, int]]:
-    cols, rows = grid_dimensions(config)
-    cell = config.cell_size_px
+    geometry = page_geometry(config)
     return valid_cells_row_major(
-        cols, rows, cell, layout_forbidden_rects(config),
+        geometry.cols, geometry.rows, geometry.cell, list(geometry.forbidden),
     )
 
 
 def data_capacity_bytes(config: PaperClipConfig) -> int:
     total_cells = data_capacity_symbols(config)
-    n = config.num_symbols
-    k, m = chunk_params(n)
-    grid_bytes = (total_cells // m) * k
-    return max(0, grid_bytes)
+    k, m = chunk_params(config.num_symbols)
+    if m <= 0:
+        return 0
+    return max(0, (total_cells // m) * k)
 
 
 def pages_needed(data_size: int, config: PaperClipConfig) -> int:
