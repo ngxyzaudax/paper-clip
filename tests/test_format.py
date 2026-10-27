@@ -26,7 +26,7 @@ def test_header_roundtrip_carries_length_dpi_and_hash() -> None:
         prepared.original_sha256, prepared.flags,
     )
     header = decode_header_bytes(blob)
-    assert header.format_version == 2
+    assert header.format_version == 3
     assert header.print_dpi == 360
     assert header.cell_size_px == 18
     assert header.margin_left_mm == 10

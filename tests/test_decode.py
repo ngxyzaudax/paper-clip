@@ -64,12 +64,12 @@ def test_distorted_page_is_rebuilt_from_parity() -> None:
     config = resolve_config(
         paper_size="A6", print_dpi=360, cell_size_px=18, margin_mm=10, redundancy_pages=1,
     )
-    raw = os.urandom(1800)
+    raw = os.urandom(700)
     pages = render_arrays(raw, config, "distort.bin")
     assert len(pages) == 3
-    scans = [_paint_data_cells(pages[0], config), pages[1], pages[2]]
+    scans = [_paint_data_cells(pages[0], config), *pages[1:]]
     with pytest.raises(DecodeError, match="Reed-Solomon"):
-        decode(scans[:2], use_model=False)
+        decode(scans[:-1], use_model=False)
     recovered, name = decode(scans, use_model=False)
     assert name == "distort.bin"
     assert recovered == raw
