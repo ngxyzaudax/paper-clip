@@ -10,7 +10,7 @@ Serialize files to **physical paper** as high-resolution PNGs: a color-coded dot
 ## Prerequisites
 
 - **[uv](https://docs.astral.sh/uv/)** — required. Install it [using the official instructions](https://docs.astral.sh/uv/getting-started/installation/) for your OS.
-- **Scanner / printer (optional):** for the `devices` command and **Devices** TUI tab, [SANE](https://sane-project.gitlab.io/) and [CUPS](https://www.cups.org/) backends plus the `python-sane` and `pycups` packages let the app list hardware and save defaults.
+- **Printer / scanner:** discovery, printing, and scanning use **IPP Everywhere** and **eSCL** (AirScan). No vendor driver, CUPS queue, or SANE backend is required. `pycups` and `python-sane` stay optional extras for an existing driverless queue or a local SANE device.
 
 ---
 
@@ -55,9 +55,19 @@ From the repository root:
 |---------|---------|
 | `encode` | File → PNG page(s) (same workflow as **Encode File** in the TUI) |
 | `decode` | Scanned PNG/JPEG/TIFF, a directory, or a scan job → original file |
-| `devices` | Scanner / printer discovery and defaults (same as **Devices** in the TUI) |
+| `print` | PNG page → IPP Everywhere job (bordered, 100% scale, color, best quality available) |
+| `scan` | One eSCL platen scan → JPEG or PNG |
+| `devices` | IPP / eSCL discovery and the safe print ticket (same devices as the TUI) |
 
 Use `uv run paper-clip <command> --help` for flags, or run `paper-clip` with no arguments for the TUI.
+
+### Driverless printing and scanning
+
+`paper-clip devices` browses mDNS for `_ipp._tcp`, `_ipps._tcp`, and `_uscan._tcp`. A saved `printer.uri` or `scanner.uri` in `data/devices.json` is used as well. `profile` on each device is reserved for later per-model options and is ignored.
+
+Printing talks IPP directly. If the printer answers plain IPP with HTTP 426 and asks for TLS, the same request is retried as IPPS. The job ticket is color, single-sided, `print-quality` high when the printer lists it, `print-scaling=none`, and a `media-col` whose margins are the smallest positive value the printer advertises (never zero). The feed is `main` (the cassette) when that source exists, otherwise another tray or `auto`. Rear, photo, and manual feeds are not chosen. The document is PWG raster when the printer offers it, otherwise JPEG. Vendor page-description languages are not sent. `ipp-attribute-fidelity` is set, and a ticket the printer will not accept is refused before a job is submitted.
+
+Scanning talks eSCL over HTTP or HTTPS. The scan is RGB JPEG of the platen at the requested resolution, or the closest resolution the scanner lists. SANE is used only when the selected device id is not an `http` or `https` URI.
 
 ---
 
@@ -67,7 +77,7 @@ Use `uv run paper-clip <command> --help` for flags, or run `paper-clip` with no 
 |------|------|
 | `src/main.py` | Logging and Typer entry |
 | `src/cli/` | Commands, Rich output, `cli/tui/` screens |
-| `src/common/` | Config, codec, compression, crypto, CUPS/SANE, layouts, types |
+| `src/common/` | Config, codec, compression, crypto, IPP/eSCL, optional CUPS/SANE, layouts, types |
 | `src/serialization/encode/` | Encoder, QR header, calibration strip, tag grid |
 | `src/serialization/decode/` | QR, AprilTag mesh dewarp, cell classification, RS, decrypt |
 | `src/ml/` | TensorFlow 2 cell decoder, synthetic trainer, saved-model loading |
@@ -144,7 +154,7 @@ paper-clip pages are **never printed borderless**. Borderless printing sprays in
 - Epson's ET-8500/ET-8550 User's Guide, *Printable Area Specifications* ([PDF](https://files.support.epson.com/docid/cpd5/cpd59879.pdf), [online](https://download4.epson.biz/sec_pubs/et-8500_series/useg/en/GUID-5EAA5A0B-C8EA-46EF-81A2-14A73CC74FEB.htm)), gives **3 mm (0.12 in)** as the minimum top, bottom, left and right margin for single sheets printed with borders.
 - `format_spec.MIN_MARGIN_MM` is that **3 mm plus a 1 mm safety allowance = 4 mm**, for feed skew and driver rounding. `resolve_config` and header parsing reject any margin below it, so neither the encoder nor a crafted header can request a borderless layout.
 - The default is **5 mm** (`DEFAULT_MARGIN_MM`). Moving from 12 mm to 5 mm adds about 14% capacity on A4; going down to the 4 mm floor would add only about 2% more.
-- Print at 100% / actual size, with borderless off. When printing from the rear paper feed slot, Epson cannot print within 20 mm of the bottom edge, so use the cassette or set a 20 mm bottom margin. Epson also marks the top 41 mm and bottom 37 mm as areas where quality can drop; the tag mesh and Reed–Solomon parity absorb that.
+- Print at 100% / actual size, with borderless off. `paper-clip print` asks the printer for that directly: `print-scaling=none`, a positive `media-col` margin, and cassette (`main`) feed when the printer advertises it. When printing from the rear paper feed slot, Epson cannot print within 20 mm of the bottom edge, so use the cassette or set a 20 mm bottom margin. Epson also marks the top 41 mm and bottom 37 mm as areas where quality can drop; the tag mesh and Reed–Solomon parity absorb that.
 
 ### Payload and parity
 

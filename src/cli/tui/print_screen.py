@@ -10,8 +10,10 @@ from textual.widgets import Button, Label, Static
 
 from cli.tui.option_picker_screen import OptionPickerScreen
 from cli.tui.print_jobs import PrintJob, discover_print_jobs, job_option_label
-from common.cups_client import list_printers, print_files
+from cli.tui.devices_worker import discover_printers
 from common.device_config import get_printer_settings
+from common.ipp_media import MEDIA_SIZES
+from common.ipp_print import print_pages
 from common.types import PrinterInfo
 
 
@@ -145,20 +147,13 @@ class PrintScreen(Widget):
             self.query_one("#print-status", Static).update,
             "[bold]Discovering printers and jobs...[/bold]",
         )
-        printers = list_printers()
+        held: list[PrinterInfo] = []
+        printer_options, printer_name = discover_printers(held)
+        printers = held
         jobs = discover_print_jobs()
-        saved_printer = get_printer_settings().get("name", "")
-
-        printer_options = [
-            (f"{p.name} ({p.state})" + (" [default]" if p.is_default else ""), p.name)
-            for p in printers
-        ]
-        printer_name = None
-        if saved_printer and any(name == saved_printer for _, name in printer_options):
+        saved_printer = str(get_printer_settings().get("uri", ""))
+        if saved_printer and any(uri == saved_printer for _, uri in printer_options):
             printer_name = saved_printer
-        elif printers:
-            default = next((p.name for p in printers if p.is_default), None)
-            printer_name = default or printers[0].name
 
         job_options = [(job_option_label(job), job.job_id) for job in jobs]
         job_id = job_options[0][1] if job_options else None
@@ -221,7 +216,8 @@ class PrintScreen(Widget):
             "[bold]Submitting print job...[/bold]",
         )
         try:
-            ids = print_files(printer, list(job.page_paths), f"paper-clip {job.job_id}")
+            paper = job.paper_size if job.paper_size in MEDIA_SIZES else "A4"
+            ids = print_pages(printer, list(job.page_paths), f"paper-clip {job.job_id}", paper)
             ids_text = ", ".join(str(i) for i in ids)
             self.app.call_from_thread(
                 self.query_one("#print-status", Static).update,

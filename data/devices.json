@@ -1,12 +1,16 @@
 {
   "printer": {
-    "name": "paper-clip-esc-p-r",
+    "name": "",
+    "uri": "",
     "dpi": 0,
-    "paper_size": "A4"
+    "paper_size": "A4",
+    "profile": {}
   },
   "scanner": {
-    "device": "airscan:e0:EPSON ET-8500 Series",
+    "device": "",
+    "uri": "",
     "dpi": 1200,
-    "mode": "Color"
+    "mode": "Color",
+    "profile": {}
   }
 }

@@ -26,8 +26,10 @@ def status_text() -> str:
     parts: list[str] = []
     try:
         from common.device_config import get_printer_settings, get_scanner_settings
-        pr = get_printer_settings().get("name", "")
-        sc = get_scanner_settings().get("device", "")
+        printer = get_printer_settings()
+        scanner = get_scanner_settings()
+        pr = str(printer.get("name") or printer.get("uri") or "")
+        sc = str(scanner.get("uri") or scanner.get("device") or "")
         if pr:
             parts.append(f"Pr: {pr[:18]}")
         if sc:

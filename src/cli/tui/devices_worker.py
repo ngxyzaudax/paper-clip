@@ -48,62 +48,89 @@ def pick_button_label(
 def discover_printers(
     printers_out: list[PrinterInfo],
 ) -> tuple[list[tuple[str, str]], str | None]:
-    from common.cups_client import list_printers
+    from common.device_discover import list_ipp_printers
+
     printers_out.clear()
-    printers_out.extend(list_printers())
-    saved = get_printer_settings()
+    printers_out.extend(list_ipp_printers())
+    saved = str(get_printer_settings().get("uri", ""))
     options = [
-        (f"{p.name} ({p.state})" + (" [default]" if p.is_default else ""), p.name)
-        for p in printers_out
+        (f"{printer.name} ({printer.state})", printer.uri)
+        for printer in printers_out
     ]
-    saved_name = saved.get("name", "")
-    initial = saved_name if any(p.name == saved_name for p in printers_out) else None
+    initial = saved if any(printer.uri == saved for printer in printers_out) else None
+    if initial is None and printers_out:
+        initial = printers_out[0].uri
     return options, initial
 
 
 def discover_scanners(
     scanners_out: list[ScannerInfo],
 ) -> tuple[list[tuple[str, str]], str | None]:
+    from common.device_discover import list_escl_scanners, saved_scanner_uri
     from common.sane_discovery import list_scanners
+
     scanners_out.clear()
+    scanners_out.extend(list_escl_scanners())
     scanners_out.extend(list_scanners())
-    saved = get_scanner_settings()
+    saved = saved_scanner_uri() or str(get_scanner_settings().get("device", ""))
     options = [
-        (f"{s.vendor} {s.model}" if s.vendor else s.device_id, s.device_id)
-        for s in scanners_out
+        (f"{scanner.vendor} {scanner.model}".strip() or scanner.device_id, scanner.device_id)
+        for scanner in scanners_out
     ]
-    saved_device = saved.get("device", "")
-    initial = saved_device if any(s.device_id == saved_device for s in scanners_out) else None
+    initial = saved if any(scanner.device_id == saved for scanner in scanners_out) else None
+    if initial is None and scanners_out:
+        initial = scanners_out[0].device_id
     return options, initial
 
 
-def format_printer_caps(printer_name: str) -> str:
-    from common.cups_client import get_printer_capabilities
-    caps = get_printer_capabilities(printer_name)
-    if caps is None:
-        return "[yellow]Could not read capabilities[/yellow]"
-    res_str = ", ".join(f"{x}x{y}" for x, y in caps.resolutions) or "not reported"
-    paper_str = ", ".join(caps.paper_sizes[:10]) or "none"
-    color_str = ", ".join(caps.color_modes) or "none"
-    duplex_str = ", ".join(caps.duplex_modes) or "none"
+def format_printer_caps(printer_uri: str) -> str:
+    from common.device_error import DeviceError
+    from common.ipp_client import printer_attributes
+    from common.ipp_options import build_ticket
+
+    paper = str(get_printer_settings().get("paper_size") or "A4")
+    try:
+        ticket = build_ticket(printer_attributes(printer_uri), paper)
+    except DeviceError as exc:
+        return f"[yellow]{exc}[/yellow]"
     return (
-        f"[bold]Resolutions:[/bold] {res_str}\n"
-        f"[bold]Paper:[/bold] {paper_str}\n"
-        f"[bold]Color:[/bold] {color_str}\n"
-        f"[bold]Duplex:[/bold] {duplex_str}"
+        f"[bold]URI:[/bold] {printer_uri}\n"
+        f"[bold]Document:[/bold] {ticket.document_format} at {ticket.dpi} dpi\n"
+        f"[bold]Media:[/bold] {ticket.media.keyword}, {ticket.source}, "
+        f"{ticket.margin / 100:.1f} mm margin\n"
+        f"[bold]Print:[/bold] {ticket.color}, quality {ticket.quality}, "
+        f"scaling {ticket.scaling}, {ticket.sides}"
     )
 
 
 def format_scanner_caps(device_id: str) -> str:
+    if device_id.startswith(("http://", "https://")):
+        return _escl_caps(device_id)
     from common.sane_discovery import get_scanner_capabilities
+
     caps = get_scanner_capabilities(device_id)
     if caps is None:
         return "[yellow]Could not read capabilities[/yellow]"
-    res_str = ", ".join(str(r) for r in caps.resolutions) or "not reported"
-    mode_str = ", ".join(caps.modes) or "none"
-    source_str = ", ".join(caps.sources) or "none"
+    resolutions = ", ".join(str(item) for item in caps.resolutions) or "not reported"
     return (
-        f"[bold]DPI:[/bold] {res_str}\n"
-        f"[bold]Modes:[/bold] {mode_str}\n"
-        f"[bold]Sources:[/bold] {source_str}"
+        f"[bold]DPI:[/bold] {resolutions}\n"
+        f"[bold]Modes:[/bold] {', '.join(caps.modes) or 'none'}\n"
+        f"[bold]Sources:[/bold] {', '.join(caps.sources) or 'none'}"
+    )
+
+
+def _escl_caps(uri: str) -> str:
+    from common.device_error import DeviceError
+    from common.escl_scan import scanner_capabilities
+
+    try:
+        caps = scanner_capabilities(uri)
+    except DeviceError as exc:
+        return f"[yellow]{exc}[/yellow]"
+    resolutions = ", ".join(str(item) for item in caps.resolutions) or "not reported"
+    return (
+        f"[bold]URI:[/bold] {uri}\n"
+        f"[bold]DPI:[/bold] {resolutions}\n"
+        f"[bold]Modes:[/bold] {', '.join(caps.color_modes) or 'RGB24'}\n"
+        f"[bold]Source:[/bold] {caps.source}"
     )

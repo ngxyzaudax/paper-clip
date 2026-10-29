@@ -22,7 +22,7 @@ from cli.tui.scan_worker import (
     resolve_max_dpi,
 )
 from common.device_config import get_scanner_settings
-from common.sane_scan import capture_scan
+from common.scan_capture import capture_page
 
 
 def _pick_label(
@@ -146,7 +146,7 @@ class ScanScreen(Widget):
             f"[bold]Scanning page {target.stem}… (max DPI={self._max_dpi})[/bold]",
         )
         try:
-            result = capture_scan(device, target)
+            result = capture_page(device, target, self._max_dpi)
         except Exception as exc:
             self._set_status_threadsafe(f"[red]Scan failed: {exc}[/red]")
             return

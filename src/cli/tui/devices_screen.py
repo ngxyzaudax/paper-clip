@@ -136,13 +136,15 @@ class DevicesScreen(Widget):
             self._open_device_picker("scanner")
 
     def _save_defaults(self) -> None:
-        if self._printer_name:
-            save_printer_settings(name=self._printer_name)
+        printer = next((item for item in self._printers if item.uri == self._printer_name), None)
+        if printer is not None:
+            save_printer_settings(name=printer.name, uri=printer.uri)
         if self._scanner_device:
             saved = get_scanner_settings()
             save_scanner_settings(
                 device=self._scanner_device,
-                dpi=saved.get("dpi", 1200),
+                uri=self._scanner_device if self._scanner_device.startswith(("http://", "https://")) else "",
+                dpi=int(saved.get("dpi", 1200) or 1200),
                 mode=str(saved.get("mode", "Color")),
             )
         self.query_one("#status", Static).update("[bold green]Default devices saved[/bold green]")
