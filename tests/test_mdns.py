@@ -12,6 +12,13 @@ def test_dns_name_follows_a_pointer() -> None:
     assert offset == len(packet)
 
 
+def test_ptr_without_srv_is_ignored() -> None:
+    service_type = "_ipp._tcp.local"
+    instance = "EPSON ET-8500 Series._ipp._tcp.local"
+    packet = _response((_record(service_type, 12, encode_dns_name(instance)),))
+    assert services_from_records(parse_packet(packet), service_type) == []
+
+
 def test_ipp_service_uses_address_port_and_resource() -> None:
     service_type = "_ipp._tcp.local"
     instance = "EPSON ET-8500 Series._ipp._tcp.local"

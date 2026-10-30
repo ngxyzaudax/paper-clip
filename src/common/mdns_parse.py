@@ -47,7 +47,8 @@ def services_from_records(records: list[Record], service_type: str) -> list[Serv
         for record in records
         if record.kind == _PTR and record.name.lower() == wanted and record.target
     ]
-    return [_service(records, service_type, instance) for instance in dict.fromkeys(instances)]
+    services = [_service(records, service_type, instance) for instance in dict.fromkeys(instances)]
+    return [service for service in services if service.port]
 
 
 def _service(records: list[Record], service_type: str, instance: str) -> Service:

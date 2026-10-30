@@ -2,7 +2,7 @@
 
 Serialize files to **physical paper** as high-resolution PNGs: a color-coded dot grid carries compressed, error-corrected data with QR headers and calibration marks. Optional encryption and page-level parity are supported. The CLI and TUI focus on **encoding** and **hardware discovery** (printers and scanners).
 
-- **Python:** 3.13+ (see `.python-version`)
+- **Python:** 3.13+ (see `.python-version`), on macOS or Linux
 - **CLI:** [Typer](https://typer.tiangolo.com/) — run `paper-clip` with arguments, or launch with **no arguments** for the [Textual](https://textual.textualize.io/) TUI.
 
 ---
@@ -10,7 +10,7 @@ Serialize files to **physical paper** as high-resolution PNGs: a color-coded dot
 ## Prerequisites
 
 - **[uv](https://docs.astral.sh/uv/)** — required. Install it [using the official instructions](https://docs.astral.sh/uv/getting-started/installation/) for your OS.
-- **Printer / scanner:** discovery, printing, and scanning use **IPP Everywhere** and **eSCL** (AirScan). No vendor driver, CUPS queue, or SANE backend is required. `pycups` and `python-sane` stay optional extras for an existing driverless queue or a local SANE device.
+- **Printer / scanner:** discovery, printing, and scanning use **IPP Everywhere** and **eSCL** (AirScan) on both macOS and Linux. No vendor driver, CUPS queue, or SANE backend is required. `pycups` is an optional extra on both. `python-sane` is an optional extra on Linux only; macOS has no SANE library.
 
 ---
 
@@ -63,11 +63,11 @@ Use `uv run paper-clip <command> --help` for flags, or run `paper-clip` with no 
 
 ### Driverless printing and scanning
 
-`paper-clip devices` browses mDNS for `_ipp._tcp`, `_ipps._tcp`, and `_uscan._tcp`. A saved `printer.uri` or `scanner.uri` in `data/devices.json` is used as well. `profile` on each device is reserved for later per-model options and is ignored.
+`paper-clip devices` browses mDNS for `_ipp._tcp`, `_ipps._tcp`, and `_uscan._tcp`. Queries go out from each IPv4 interface on its own ephemeral port, which is where the unicast reply comes back. A second socket listens on UDP port 5353 for multicast replies. macOS shares that port with mDNSResponder. Linux shares it with Avahi without `SO_REUSEPORT`, because that option would hand each multicast packet to only one listener. Saved device URIs use the literal address from the reply, so Linux does not need `nss-mdns` to resolve `.local`. A saved `printer.uri` or `scanner.uri` in `data/devices.json` is used as well. `profile` on each device is reserved for later per-model options and is ignored.
 
 Printing talks IPP directly. If the printer answers plain IPP with HTTP 426 and asks for TLS, the same request is retried as IPPS. The job ticket is color, single-sided, `print-quality` high when the printer lists it, `print-scaling=none`, and a `media-col` whose margins are the smallest positive value the printer advertises (never zero). The feed is `main` (the cassette) when that source exists, otherwise another tray or `auto`. Rear, photo, and manual feeds are not chosen. The document is PWG raster when the printer offers it, otherwise JPEG. Vendor page-description languages are not sent. `ipp-attribute-fidelity` is set, and a ticket the printer will not accept is refused before a job is submitted.
 
-Scanning talks eSCL over HTTP or HTTPS. The scan is RGB JPEG of the platen at the requested resolution, or the closest resolution the scanner lists. SANE is used only when the selected device id is not an `http` or `https` URI.
+Scanning talks eSCL over HTTP or HTTPS. The scan is RGB JPEG of the platen at the requested resolution, or the closest resolution the scanner lists. SANE is used only on Linux, and only when the selected device id is not an `http` or `https` URI.
 
 ---
 
@@ -180,4 +180,4 @@ Hardware discovery integrations are optional and installed with:
 uv sync --extra hardware
 ```
 
-This extra includes `pycups` and `python-sane`.
+This extra includes `pycups` on macOS and Linux, and `python-sane` on Linux. Building those packages needs the system headers (`libcups2-dev` and `libsane-dev` on Debian). The core install does not. The TensorFlow cell decoder is installed on Linux and on Apple Silicon. An Intel Mac still encodes, prints, scans, and decodes with nearest-colour classification.

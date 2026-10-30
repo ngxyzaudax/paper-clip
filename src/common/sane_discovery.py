@@ -1,29 +1,42 @@
 import logging
 import subprocess
+import sys
 
 from common.types import ScannerCapabilities, ScannerInfo
 
 logger = logging.getLogger(__name__)
 
+_sane_initialized = False
+_sane_unavailable = False
+
 
 def _ensure_sane() -> bool:
-    global _sane_initialized
+    global _sane_initialized, _sane_unavailable
     if _sane_initialized:
         return True
+    if _sane_unavailable:
+        return False
     try:
         import sane
         sane.init()
-        _sane_initialized = True
-        return True
     except ImportError:
-        logger.warning("python-sane not installed; scanner discovery unavailable")
+        _remember_sane_missing()
         return False
     except Exception as exc:
+        _sane_unavailable = True
         logger.warning("SANE initialization failed: %s", exc)
         return False
+    _sane_initialized = True
+    return True
 
 
-_sane_initialized = False
+def _remember_sane_missing() -> None:
+    global _sane_unavailable
+    _sane_unavailable = True
+    if sys.platform == "linux":
+        logger.warning("python-sane not installed; scanner discovery unavailable")
+        return
+    logger.debug("SANE is not available on %s", sys.platform)
 
 
 def list_scanners() -> list[ScannerInfo]:

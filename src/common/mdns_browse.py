@@ -1,15 +1,16 @@
 import logging
+import select
 import socket
 import struct
 import time
 
 from common.mdns_name import encode_dns_name
 from common.mdns_parse import Service, parse_packet, services_from_records
+from common.mdns_socket import MdnsPorts, close_mdns_ports, mdns_sockets, open_mdns_ports, send_queries
 
 logger = logging.getLogger(__name__)
 
 DRIVERLESS_TYPES = ("_ipp._tcp.local", "_ipps._tcp.local", "_uscan._tcp.local")
-_MDNS = ("224.0.0.251", 5353)
 
 
 def browse_types(service_types: tuple[str, ...] = DRIVERLESS_TYPES, timeout: float = 1.6) -> dict[str, list[Service]]:
@@ -21,34 +22,48 @@ def browse_types(service_types: tuple[str, ...] = DRIVERLESS_TYPES, timeout: flo
 def _collect(service_types: tuple[str, ...], timeout: float) -> list[bytes]:
     queries = [_question(service_type) for service_type in service_types]
     try:
-        with _socket() as sock:
-            for query in queries:
-                sock.sendto(query, _MDNS)
-            return _receive(sock, queries, timeout)
+        ports = open_mdns_ports()
     except OSError as exc:
         logger.warning("mDNS browse failed: %s", exc)
         return []
+    try:
+        send_queries(list(ports.senders), queries)
+        return _receive(ports, queries, timeout)
+    except OSError as exc:
+        logger.warning("mDNS browse failed: %s", exc)
+        return []
+    finally:
+        close_mdns_ports(ports)
 
 
-def _socket() -> socket.socket:
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 255)
-    sock.settimeout(0.25)
-    return sock
-
-
-def _receive(sock: socket.socket, queries: list[bytes], timeout: float) -> list[bytes]:
+def _receive(ports: MdnsPorts, queries: list[bytes], timeout: float) -> list[bytes]:
     found: list[bytes] = []
+    watch = list(mdns_sockets(ports))
     deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
+    while True:
+        wait = deadline - time.monotonic()
+        if wait <= 0:
+            return found
+        readable, _, _ = select.select(watch, [], [], min(0.25, wait))
+        if not readable:
+            send_queries(list(ports.senders), queries)
+            continue
+        for sock in readable:
+            found.extend(_read(sock))
+    return found
+
+
+def _read(sock: socket.socket) -> list[bytes]:
+    found: list[bytes] = []
+    while True:
         try:
             data, _addr = sock.recvfrom(9000)
-        except TimeoutError:
-            for query in queries:
-                sock.sendto(query, _MDNS)
-            continue
+        except BlockingIOError:
+            return found
+        except OSError as exc:
+            logger.debug("mDNS receive failed: %s", exc)
+            return found
         found.append(data)
-    return found
 
 
 def _question(name: str) -> bytes:
