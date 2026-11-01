@@ -4,6 +4,7 @@ from pathlib import Path
 import numpy as np
 
 from serialization.decode.assemble import assemble_pages
+from serialization.decode.errors import DecodeError
 from serialization.decode.load_scan import load_scans
 from serialization.decode.observe import observe_page
 
@@ -17,16 +18,35 @@ def decode(
     model_path: Path | None = None,
     use_model: bool | None = None,
 ) -> tuple[bytes, str]:
+    images = list(load_scans(source))
     model = _load_model(model_path, use_model)
-    pages = [observe_page(image, model) for image in load_scans(source)]
-    logger.info("Decoded QR headers from %d scan(s)", len(pages))
-    raw, filename = assemble_pages(pages, passphrase)
+    raw, filename = _recover(images, model, passphrase)
     if output_path is not None:
         destination = output_path / filename if output_path.is_dir() else output_path
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes(raw)
         logger.info("Wrote %s (%d bytes)", destination, len(raw))
     return raw, filename
+
+
+def _recover(
+    images: list[np.ndarray], model: object | None, passphrase: str | None,
+) -> tuple[bytes, str]:
+    try:
+        return _assemble(images, model, passphrase)
+    except DecodeError:
+        if model is None:
+            raise
+        logger.info("Cell model left the payload unreadable; retrying with nearest colour")
+        return _assemble(images, None, passphrase)
+
+
+def _assemble(
+    images: list[np.ndarray], model: object | None, passphrase: str | None,
+) -> tuple[bytes, str]:
+    pages = [observe_page(image, model) for image in images]
+    logger.info("Decoded QR headers from %d scan(s)", len(pages))
+    return assemble_pages(pages, passphrase)
 
 
 def _load_model(model_path: Path | None, use_model: bool | None):

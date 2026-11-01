@@ -8,6 +8,14 @@ from common.ipp_ticket import get_attributes_request, job_request, job_status_re
 
 _OK = {0x0000, 0x0001, 0x0002}
 _SAFETY = {"media", "media-col", "print-color-mode", "print-scaling", "sides", "printer-resolution"}
+_STATUS = {
+    0x0400: "client-error-bad-request",
+    0x040A: "client-error-document-format-not-supported",
+    0x040B: "client-error-attributes-or-values-not-supported",
+    0x0410: "client-error-compression-error",
+    0x0411: "client-error-document-format-error",
+    0x0503: "server-error-temporary-error",
+}
 _FAILED_JOB = {7, 8}
 _DONE_JOB = 9
 
@@ -52,8 +60,26 @@ def _job_state(uri: str, job_id: int) -> int:
 def _exchange(uri: str, request: bytes, timeout: float) -> IppMessage:
     message = unpack_message(post_ipp(uri, request, timeout))
     if message.status not in _OK:
-        raise DeviceError(f"IPP status {message.status:#06x} from {uri}")
+        raise DeviceError(_status_text(message, uri))
     blocked = [name for name in message.unsupported if name in _SAFETY]
     if blocked:
         raise DeviceError("printer ignored required print options: " + ", ".join(blocked))
     return message
+
+
+def _status_text(message: IppMessage, uri: str) -> str:
+    name = _STATUS.get(message.status, "unknown")
+    detail = _status_detail(message)
+    base = f"IPP status {message.status:#06x} {name} from {uri}"
+    return f"{base}; {detail}" if detail else base
+
+
+def _status_detail(message: IppMessage) -> str:
+    parts = [_attribute_text(message, "status-message"), _attribute_text(message, "detailed-status-message")]
+    if message.unsupported:
+        parts.append("unsupported: " + ", ".join(message.unsupported))
+    return "; ".join(part for part in parts if part)
+
+
+def _attribute_text(message: IppMessage, name: str) -> str:
+    return " ".join(str(item) for item in message.attributes.get(name, []))

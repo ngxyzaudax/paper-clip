@@ -39,6 +39,25 @@ def test_print_pages_rejects_an_empty_list() -> None:
         print_pages("ipp://printer.example/ipp/print", [], "paper-clip")
 
 
+def test_print_pages_stays_one_sided_when_duplex_is_listed(monkeypatch, tmp_path: Path) -> None:
+    page = tmp_path / "page.png"
+    page.write_bytes(b"png")
+    attributes = _attributes()
+    attributes["sides-supported"] = ["one-sided", "two-sided-long-edge", "two-sided-short-edge"]
+    seen: list[str] = []
+
+    monkeypatch.setattr("common.ipp_print.printer_attributes", lambda uri: attributes)
+    monkeypatch.setattr("common.ipp_print.validate_ticket", lambda uri, ticket: None)
+    monkeypatch.setattr(
+        "common.ipp_print.submit_document",
+        lambda uri, ticket, document, title: seen.append(ticket.sides) or 3,
+    )
+    monkeypatch.setattr("common.ipp_print.wait_for_job", lambda uri, job_id: "completed")
+    monkeypatch.setattr("common.ipp_print.render_document", lambda page, ticket: b"raster")
+    assert print_pages("ipp://printer.example/ipp/print", [page, page], "paper-clip") == [3, 3]
+    assert seen == ["one-sided", "one-sided"]
+
+
 def test_jpeg_ticket_keeps_resolution_and_pwg_omits_it() -> None:
     jpeg = _attributes()
     jpeg["document-format-supported"] = ["image/jpeg", "application/vnd.epson.escpr"]

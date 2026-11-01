@@ -10,16 +10,20 @@ wheels/
 # uv
 .uv/
 
-# ML
+# ML weights kept outside the package tree
 src/ml/models/*.h5
 src/ml/models/*.keras
 src/ml/models/*.pt
 src/ml/models/*.pth
 src/ml/models/*.onnx
 src/ml/models/*.tflite
+
+# Local prints, scans, recovered files, calibration captures, and training sets
+data/print/
+data/scan/
+data/decoded/
+data/calibration/
 data/training/
-data/print/jobs/
-data/scan/jobs/
 data/models/
 
 # Datasets and calibration pipeline (large / generated)

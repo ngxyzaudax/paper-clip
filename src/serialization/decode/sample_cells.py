@@ -1,11 +1,12 @@
 import numpy as np
 
 from common.drawing import dot_radius_px
+from common.format_spec import DOT_DIAMETER_RATIO
 from common.geometry import PageGeometry
 
 
-def sample_radius(cell: int) -> int:
-    return max(1, dot_radius_px(cell) // 4)
+def sample_radius(cell: int, ratio: float = DOT_DIAMETER_RATIO) -> int:
+    return max(1, dot_radius_px(cell, ratio) // 4)
 
 
 def median_rgb(image: np.ndarray, xs: np.ndarray, ys: np.ndarray, radius: int) -> np.ndarray:

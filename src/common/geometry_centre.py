@@ -1,6 +1,6 @@
 from typing import NamedTuple
 
-from common.format_spec import CALIBRATION_REPEATS
+from common.format_spec import CALIBRATION_REPEATS, QR_MODULE_MM
 from common.geometry_qr import qr_side_px
 from common.types import Region
 
@@ -21,8 +21,9 @@ def centre_block(
     cell: int,
     dpi: int,
     num_symbols: int,
+    qr_module_mm: float = QR_MODULE_MM,
 ) -> CentreBlock:
-    side = qr_side_px(dpi)
+    side = qr_side_px(dpi, qr_module_mm)
     qr_cells = -(-side // cell)
     block_cols = max(qr_cells, num_symbols + 2)
     block_rows = qr_cells + CALIBRATION_REPEATS + 1

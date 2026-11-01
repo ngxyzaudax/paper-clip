@@ -29,6 +29,16 @@ def test_configured_uri_is_kept_when_mdns_misses_it(monkeypatch) -> None:
     assert found == [PrinterInfo("192.0.2.9", "ipps://192.0.2.9:631/ipp/print", "configured", True)]
 
 
+def test_empty_mdns_uses_the_system_uscan_browse(monkeypatch) -> None:
+    service = _service("_uscan._tcp.local", "ET-8500", 443, {"ty": "ET-8500", "usb_MFG": "EPSON"})
+    _mock_browse(monkeypatch, {})
+    monkeypatch.setattr("common.device_discover.get_scanner_settings", lambda: {"uri": "", "device": ""})
+    monkeypatch.setattr("common.device_discover._system_uscan", lambda timeout: [service])
+    found = list_escl_scanners()
+    assert len(found) == 1
+    assert found[0].device_id == "https://192.0.2.8:443"
+
+
 def test_escl_discovery_uses_the_uscan_service(monkeypatch) -> None:
     service = _service("_uscan._tcp.local", "ET-8500", 443, {"ty": "ET-8500", "usb_MFG": "EPSON", "rs": "eSCL"})
     _mock_browse(monkeypatch, {"_uscan._tcp.local": [service]})
@@ -43,6 +53,7 @@ def test_escl_discovery_uses_the_uscan_service(monkeypatch) -> None:
 def _mock_browse(monkeypatch, found: dict[str, list[Service]]) -> None:
     device_discover._CACHE = None
     monkeypatch.setattr("common.device_discover.browse_types", lambda timeout=1.6: found)
+    monkeypatch.setattr("common.device_discover._queue_printers", lambda saved: [])
 
 
 def _service(service_type: str, instance: str, port: int, txt: dict[str, str]) -> Service:

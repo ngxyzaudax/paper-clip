@@ -24,7 +24,5 @@ def render_data_grid(
             x = x_base + col_idx * cell
             y = y_base + row_idx * cell
             color = palette[symbol_idx - 1] if symbol_idx > 0 else None
-            draw_dot_cell(
-                draw, x, y, cell, color,
-            )
+            draw_dot_cell(draw, x, y, cell, color, config.dot_ratio)
     return image

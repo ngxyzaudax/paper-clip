@@ -3,14 +3,27 @@ from common.geometry_measure import mm_to_px
 from common.geometry_types import TagMark
 
 
-def tag_pixel_size(dpi: int) -> int:
+def tag_pixel_size(dpi: int, tag_mm: float = TAG_SIZE_MM) -> int:
+    base = _legacy_tag_px(dpi)
+    if _is_legacy(tag_mm):
+        return base
+    return max(16, int(round(base * tag_mm / TAG_SIZE_MM)))
+
+
+def tag_quiet_px(dpi: int, tag_mm: float = TAG_SIZE_MM) -> int:
+    base = max(8, mm_to_px(TAG_QUIET_MM, dpi))
+    if _is_legacy(tag_mm):
+        return base
+    return max(4, int(round(base * tag_mm / TAG_SIZE_MM)))
+
+
+def _legacy_tag_px(dpi: int) -> int:
     raw = max(40, mm_to_px(TAG_SIZE_MM, dpi))
-    snapped = max(40, (raw // 10) * 10)
-    return snapped
+    return max(40, (raw // 10) * 10)
 
 
-def tag_quiet_px(dpi: int) -> int:
-    return max(8, mm_to_px(TAG_QUIET_MM, dpi))
+def _is_legacy(tag_mm: float) -> bool:
+    return abs(float(tag_mm) - TAG_SIZE_MM) < 0.05
 
 
 def choose_tag_grid(

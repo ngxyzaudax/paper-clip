@@ -8,7 +8,7 @@ from common.page_layout import alignment_tag_placements, margin_offset
 
 def draw_apriltag_layer(image: Image.Image, config: PaperClipConfig) -> Image.Image:
     mx, my = margin_offset(config)
-    quiet = tag_quiet_px(config.print_dpi)
+    quiet = tag_quiet_px(config.print_dpi, config.tag_size_mm)
     draw = ImageDraw.Draw(image)
     for left, top, tag_id, size in alignment_tag_placements(config):
         x = mx + left

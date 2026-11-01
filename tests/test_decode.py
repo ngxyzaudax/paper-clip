@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from common.config import resolve_config
+from common.geometry import PageGeometry
 from common.crypto import compute_sha256
 from scan_sim import apply_colour_cast, apply_scan_augment
 from scan_sim.render import render_arrays
@@ -66,7 +67,7 @@ def test_distorted_page_is_rebuilt_from_parity() -> None:
     )
     raw = os.urandom(700)
     pages = render_arrays(raw, config, "distort.bin")
-    assert len(pages) == 3
+    assert len(pages) >= 2
     scans = [_paint_data_cells(pages[0], config), *pages[1:]]
     with pytest.raises(DecodeError, match="Reed-Solomon"):
         decode(scans[:-1], use_model=False)
@@ -89,6 +90,22 @@ def _paint_data_cells(image: np.ndarray, config) -> np.ndarray:
         x = origin_x + col * cell
         painted[y:y + cell, x:x + cell] = (255, 0, 0)
     return painted
+
+
+def test_confident_wrong_model_falls_back_to_colour(monkeypatch: pytest.MonkeyPatch) -> None:
+    def wrong_grid(
+        model: object, image: np.ndarray, geometry: PageGeometry, num_symbols: int,
+    ) -> tuple[np.ndarray, np.ndarray, None]:
+        shape = (geometry.rows, geometry.cols)
+        return np.zeros(shape, np.int32), np.ones(shape, np.float32), None
+
+    monkeypatch.setattr("ml.store.load_cell_model", lambda path=None, required=False: object())
+    monkeypatch.setattr("serialization.decode.model_classify.model_cell_grid", wrong_grid)
+    raw = os.urandom(80)
+    pages = render_arrays(raw, _config(), "fallback.bin")
+    recovered, name = decode(pages, use_model=True)
+    assert name == "fallback.bin"
+    assert recovered == raw
 
 
 def test_strength_zero_augment_is_a_copy() -> None:

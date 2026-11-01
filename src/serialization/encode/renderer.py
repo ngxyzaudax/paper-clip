@@ -1,6 +1,8 @@
 from PIL import Image
 
 from common.config import PaperClipConfig
+from common.qr_scale import flags_with_qr_mm
+from common.tag_scale import flags_with_tag_mm
 from common.page_layout import page_image_size
 from common.types import SymbolGrid
 from serialization.encode.alignment import draw_apriltag_layer
@@ -30,7 +32,7 @@ def render_page(
         len(prepared.payload),
         prepared.original_length,
         prepared.original_sha256,
-        prepared.flags,
+        flags_with_qr_mm(flags_with_tag_mm(prepared.flags, config.tag_size_mm), config.qr_module_mm),
     )
     image = render_qr_header(header, image, config)
     return draw_apriltag_layer(image, config)

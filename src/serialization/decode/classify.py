@@ -33,7 +33,8 @@ def classify_cells(
         predicted = None
     xs, ys = cell_centers(geometry, cells, shift_x, shift_y)
     sampled = image if colour_image is None else colour_image
-    colour_sym, colour_conf = nearest_symbols(median_rgb(sampled, xs, ys, sample_radius(geometry.cell)), references)
+    radius = sample_radius(geometry.cell, config.dot_ratio)
+    colour_sym, colour_conf = nearest_symbols(median_rgb(sampled, xs, ys, radius), references)
     symbols: list[int] = []
     confidence: list[float] = []
     for index, (row, col) in enumerate(cells):

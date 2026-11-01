@@ -8,6 +8,7 @@ from common.device_uri import printer_from_service, scanner_from_service
 from common.types import PrinterInfo, ScannerInfo
 
 _CACHE: tuple[float, dict[str, list[Service]]] | None = None
+_LAST_USCAN: tuple[Service, ...] = ()
 
 
 def list_ipp_printers(timeout: float = 1.6) -> list[PrinterInfo]:
@@ -16,13 +17,38 @@ def list_ipp_printers(timeout: float = 1.6) -> list[PrinterInfo]:
         _services("_ipp._tcp.local", timeout) + _services("_ipps._tcp.local", timeout),
     )
     found = [printer_from_service(service, saved) for service in services]
+    if not found:
+        found = _queue_printers(saved)
     return _include_printer(found, saved)
+
+
+def _queue_printers(saved: str) -> list[PrinterInfo]:
+    from common.cups_queues import queue_printers
+
+    return queue_printers(saved)
 
 
 def list_escl_scanners(timeout: float = 1.6) -> list[ScannerInfo]:
     saved = saved_scanner_uri()
-    found = [scanner_from_service(service, saved) for service in _services("_uscan._tcp.local", timeout)]
+    found = [scanner_from_service(service, saved) for service in _uscan(timeout)]
     return _include_scanner(found, saved)
+
+
+def last_uscan_services() -> tuple[Service, ...]:
+    return _LAST_USCAN
+
+
+def _uscan(timeout: float) -> list[Service]:
+    global _LAST_USCAN
+    services = _services("_uscan._tcp.local", timeout) or _system_uscan(timeout)
+    _LAST_USCAN = tuple(services)
+    return services
+
+
+def _system_uscan(timeout: float) -> list[Service]:
+    from common.system_browse import system_uscan_services
+
+    return system_uscan_services(max(timeout, 2))
 
 
 def saved_scanner_uri() -> str:

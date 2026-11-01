@@ -53,6 +53,7 @@ def compose_scan_screen() -> ComposeResult:
                     compact=True,
                     disabled=True,
                 )
+                yield Button("Decode this job", id="btn-scan-decode", compact=True, disabled=True)
             yield Static("", id="scan-status")
 
 

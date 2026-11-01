@@ -11,16 +11,23 @@ from cli.tui.nav_config import (
     DEFAULT_NAV_ID,
     NAV_FULL,
     NAV_GROUPS,
+    NAV_ORDER,
     NAV_SHORT,
     PANEL_REGISTRY,
+    PANELS_ACCEPTING_JOB,
     status_text,
 )
+from cli.tui.nav_messages import OpenPanel
 
 
 class MainScreen(Screen):
     BINDINGS = [
         Binding("q", "quit", "Quit"),
         Binding("backslash", "toggle_sidebar", "Sidebar"),
+        *[
+            Binding(str(index), f"open_panel('{nav_id}')", NAV_FULL[nav_id].split(" ", 1)[-1], show=False)
+            for index, nav_id in enumerate(NAV_ORDER, 1)
+        ],
     ]
 
     def __init__(self) -> None:
@@ -57,15 +64,24 @@ class MainScreen(Screen):
         elif btn_id in PANEL_REGISTRY:
             self._switch_panel(btn_id)
 
-    def _switch_panel(self, nav_id: str) -> None:
+    def action_open_panel(self, nav_id: str) -> None:
+        self._switch_panel(nav_id)
+
+    def on_open_panel(self, message: OpenPanel) -> None:
+        message.stop()
+        self._switch_panel(message.nav_id, message.job_id)
+
+    def _switch_panel(self, nav_id: str, job_id: str | None = None) -> None:
         for btn in self.query(".nav-btn"):
             btn.remove_class("-active")
         self.query_one(f"#{nav_id}", Button).add_class("-active")
+        self.query_one("#sidebar-status", Static).update(status_text())
         content = self.query_one("#content-area")
         content.remove_children()
         mod_path, cls_name = PANEL_REGISTRY[nav_id]
         panel_cls = getattr(importlib.import_module(mod_path), cls_name)
-        content.mount(panel_cls())
+        wants_job = job_id is not None and nav_id in PANELS_ACCEPTING_JOB
+        content.mount(panel_cls(job_id=job_id) if wants_job else panel_cls())
 
     def action_toggle_sidebar(self) -> None:
         sidebar = self.query_one("#sidebar")

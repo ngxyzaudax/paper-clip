@@ -71,6 +71,14 @@ def test_scan_jpeg_reads_the_document_and_deletes_the_job(monkeypatch) -> None:
     assert ("DELETE", "/eSCL/ScanJobs/9") in calls
 
 
+def test_document_wait_grows_when_resolution_is_above_1200() -> None:
+    from common.escl_scan import _document_wait
+
+    assert _document_wait(100) == 45
+    assert _document_wait(1200) == 240
+    assert _document_wait(2400) == 960
+
+
 _CAPS = f"""<?xml version="1.0" encoding="UTF-8"?>
 <scan:ScannerCapabilities xmlns:scan="{SCAN}" xmlns:pwg="{PWG}">
   <pwg:MakeAndModel>EPSON ET-8500 Series</pwg:MakeAndModel>

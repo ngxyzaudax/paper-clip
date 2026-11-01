@@ -1,7 +1,9 @@
 from functools import lru_cache
 
 from common.config import PaperClipConfig
-from common.format_spec import CALIBRATION_REPEATS
+from common.format_spec import CALIBRATION_REPEATS, QR_SCALE_MM, TAG_SCALE_MM
+from common.qr_scale import qr_scale_index
+from common.tag_scale import tag_scale_index
 from common.geometry_centre import centre_block
 from common.geometry_measure import margin_px, mm_to_px, quantize_mm, snap_down
 from common.geometry_shift import clear_tags, tag_box
@@ -33,12 +35,16 @@ def _geometry_key(config: PaperClipConfig) -> tuple[float | int, ...]:
         quantize_mm(config.margin_right_mm),
         quantize_mm(config.margin_bottom_mm),
         quantize_mm(config.margin_left_mm),
+        tag_scale_index(config.tag_size_mm),
+        qr_scale_index(config.qr_module_mm),
     )
 
 
 @lru_cache(maxsize=64)
 def _page_geometry_cached(key: tuple[float | int, ...]) -> PageGeometry:
-    symbols, cell, dpi, pitch_mm, page_w_mm, page_h_mm, top, right, bottom, left = key
+    symbols, cell, dpi, pitch_mm, page_w_mm, page_h_mm, top, right, bottom, left, tag_index, qr_index = key
+    tag_mm = TAG_SCALE_MM[int(tag_index)]
+    qr_mm = QR_SCALE_MM[int(qr_index)]
     cell, dpi = int(cell), int(dpi)
     page_w = mm_to_px(float(page_w_mm), dpi)
     page_h = mm_to_px(float(page_h_mm), dpi)
@@ -49,9 +55,11 @@ def _page_geometry_cached(key: tuple[float | int, ...]) -> PageGeometry:
     if usable_w < cell * 4 or usable_h < cell * 4:
         raise ValueError("page margins leave no usable grid")
     cols, rows = usable_w // cell, usable_h // cell
-    centre = centre_block(page_w, page_h, origin_x, origin_y, cols, rows, cell, dpi, int(symbols))
-    tag = tag_pixel_size(dpi)
-    quiet = tag_quiet_px(dpi)
+    centre = centre_block(
+        page_w, page_h, origin_x, origin_y, cols, rows, cell, dpi, int(symbols), qr_mm,
+    )
+    tag = tag_pixel_size(dpi, tag_mm)
+    quiet = tag_quiet_px(dpi, tag_mm)
     tag_rows, tag_cols = choose_tag_grid(usable_w, usable_h, tag, quiet, dpi, float(pitch_mm))
     slots = place_tags(usable_w, usable_h, tag, quiet, tag_rows, tag_cols, cell)
     tags = clear_tags(slots, centre.block, quiet, usable_w, usable_h, _shift_limit(slots, tag_cols))

@@ -39,7 +39,7 @@ def test_calibration_strip_sits_under_the_qr(config) -> None:
 @pytest.mark.parametrize("config", _configs())
 def test_no_tag_or_data_cell_touches_the_centre_block(config) -> None:
     geometry = page_geometry(config)
-    quiet = tag_quiet_px(config.print_dpi)
+    quiet = tag_quiet_px(config.print_dpi, config.tag_size_mm)
     block = tuple(geometry.centre)
     for tag in geometry.tags:
         assert not _overlap((tag.x - quiet, tag.y - quiet, tag.size + 2 * quiet, tag.size + 2 * quiet), block)
@@ -64,7 +64,8 @@ def test_data_fills_every_row_around_the_qr() -> None:
     for row, _ in valid_cells_ordered(config):
         per_row[row] += 1
     assert min(per_row) >= geometry.cols // 2
-    tag_box_cells = -(-(geometry.tags[0].size + 2 * tag_quiet_px(config.print_dpi)) // geometry.cell) + 1
+    quiet = tag_quiet_px(config.print_dpi, config.tag_size_mm)
+    tag_box_cells = -(-(geometry.tags[0].size + 2 * quiet) // geometry.cell) + 1
     assert per_row[0] >= geometry.cols - geometry.tag_cols * tag_box_cells
 
 

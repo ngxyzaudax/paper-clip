@@ -15,14 +15,21 @@ def scan_command(
     dpi: int | None = typer.Option(None, "--dpi", help="Scan resolution; default 1200, or 100 for a preview"),
 ) -> None:
     """Scan one page over eSCL. Falls back to SANE only when the device id is not an HTTP URI."""
-    chosen = dpi if dpi is not None else int(get_scanner_settings().get("dpi", 1200) or 1200)
     try:
         uri = scanner_uri or _saved_or_only_scanner()
-        result = capture_page(uri, output, chosen)
+        result = capture_page(uri, output, _scan_dpi(uri, dpi))
     except DeviceError as exc:
         print_error(str(exc))
         raise typer.Exit(1) from exc
     print_success(f"Saved {result.target_path} at {result.dpi} dpi ({result.mode}, {result.source})")
+
+
+def _scan_dpi(uri: str, dpi: int | None) -> int | None:
+    if dpi is not None:
+        return dpi
+    if uri.startswith(("http://", "https://")):
+        return int(get_scanner_settings().get("dpi", 1200) or 1200)
+    return None
 
 
 def _saved_or_only_scanner() -> str:

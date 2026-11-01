@@ -8,11 +8,13 @@ from qrcode.constants import ERROR_CORRECT_H
 
 from common.codec import calculate_ecc_symbols
 from common.config import BLOCK_SIZE, PaperClipConfig
+from common.dot_ratio import pack_cell_field, unpack_cell_field
 from common.format_spec import (
     HEADER_BODY,
     HEADER_STRUCT,
     MAGIC,
     QR_BORDER_MODULES,
+    QR_MODULE_MM,
     QR_VERSION,
 )
 from common.geometry_measure import hundredths_to_mm, mm_to_hundredths
@@ -41,6 +43,7 @@ class DecodedQrHeader(NamedTuple):
     payload_length: int
     original_length: int
     original_sha256: bytes
+    dot_ratio: float = 0.62
 
 
 def encode_header_bytes(
@@ -59,7 +62,7 @@ def encode_header_bytes(
         int(round(config.tag_pitch_mm)),
         flags,
         config.num_symbols,
-        config.cell_size_px,
+        pack_cell_field(config.cell_size_px, config.dot_ratio),
         calculate_ecc_symbols(BLOCK_SIZE, config.rs_redundancy),
         config.print_dpi,
         mm_to_hundredths(config.margin_top_mm),
@@ -90,11 +93,12 @@ def decode_header_bytes(blob: bytes) -> DecodedQrHeader:
         raise ValueError("invalid header magic")
     if (zlib.crc32(blob[:-4]) & 0xFFFFFFFF) != crc:
         raise ValueError("invalid header crc")
+    cell_px, dot_ratio = unpack_cell_field(unpacked[4])
     return DecodedQrHeader(
         tag_pitch_mm=unpacked[1],
         flags=unpacked[2],
         num_symbols=unpacked[3],
-        cell_size_px=unpacked[4],
+        cell_size_px=cell_px,
         ecc_sym=unpacked[5],
         print_dpi=unpacked[6],
         margin_top_mm=hundredths_to_mm(unpacked[7]),
@@ -111,6 +115,7 @@ def decode_header_bytes(blob: bytes) -> DecodedQrHeader:
         payload_length=unpacked[18],
         original_length=unpacked[19],
         original_sha256=unpacked[20],
+        dot_ratio=dot_ratio,
     )
 
 
@@ -118,8 +123,8 @@ def header_to_qr_payload(header_bytes: bytes) -> str:
     return base64.b64encode(header_bytes).decode("ascii")
 
 
-def qr_image(header_bytes: bytes, dpi: int) -> Image.Image:
-    module = qr_module_px(dpi)
+def qr_image(header_bytes: bytes, dpi: int, module_mm: float = QR_MODULE_MM) -> Image.Image:
+    module = qr_module_px(dpi, module_mm)
     qr = qrcode.QRCode(
         version=QR_VERSION,
         error_correction=ERROR_CORRECT_H,
@@ -132,7 +137,7 @@ def qr_image(header_bytes: bytes, dpi: int) -> Image.Image:
 
 
 def render_qr_header(header_bytes: bytes, image: Image.Image, config: PaperClipConfig) -> Image.Image:
-    qr_img = qr_image(header_bytes, config.print_dpi)
+    qr_img = qr_image(header_bytes, config.print_dpi, config.qr_module_mm)
     mx, my = margin_offset(config)
     region = qr_region(config)
     if qr_img.size != (region.width, region.height):

@@ -47,6 +47,18 @@ def test_qr_image_is_native_module_size() -> None:
     assert image.size == (geometry.qr.width, geometry.qr.height)
 
 
+def test_default_preset_is_the_et8500_hold_point() -> None:
+    from common.density_preset import et8500_preset
+
+    config = default_config()
+    preset = et8500_preset()
+    assert config.cell_size_px == preset.cell_size_px == 22
+    assert config.num_symbols == preset.num_symbols == 5
+    assert config.tag_size_mm == preset.tag_size_mm == 4.0
+    assert config.tag_pitch_mm == preset.tag_pitch_mm == 16.0
+    assert config.print_dpi == preset.print_dpi == 720
+
+
 def test_default_page_fits_tags_margin_and_cell() -> None:
     config = default_config()
     geometry = page_geometry(config)

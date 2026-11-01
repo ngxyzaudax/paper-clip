@@ -1,14 +1,20 @@
-from dataclasses import dataclass, fields, replace
+from dataclasses import dataclass, fields
 
 from common.format_spec import (
     BLOCK_SIZE,
     DEFAULT_MARGIN_MM,
+    DOT_DIAMETER_RATIO,
     MIN_CELL_MM,
     MIN_MARGIN_MM,
+    QR_MODULE_MM,
     TAG_PITCH_MAX_MM,
     TAG_PITCH_MIN_MM,
     TAG_TARGET_PITCH_MM,
 )
+from common.density_preset import CELL_HOLD_PX, TAG_HOLD_MM
+from common.dot_ratio import dot_ratio_index
+from common.qr_scale import qr_scale_index
+from common.tag_scale import tag_scale_index
 
 MARGIN_MM = DEFAULT_MARGIN_MM
 
@@ -16,10 +22,11 @@ MARGIN_MM = DEFAULT_MARGIN_MM
 @dataclass(frozen=True)
 class PaperClipConfig:
     num_symbols: int = 5
-    cell_size_px: int = 32
+    cell_size_px: int = CELL_HOLD_PX
     print_dpi: int = 720
-    rs_redundancy: float = 0.45
+    rs_redundancy: float = 0.25
     tag_pitch_mm: float = TAG_TARGET_PITCH_MM
+    tag_size_mm: float = TAG_HOLD_MM
     redundancy_pages: int = 0
     page_width_mm: float = 210.0
     page_height_mm: float = 297.0
@@ -27,6 +34,8 @@ class PaperClipConfig:
     margin_right_mm: float = MARGIN_MM
     margin_bottom_mm: float = MARGIN_MM
     margin_left_mm: float = MARGIN_MM
+    qr_module_mm: float = QR_MODULE_MM
+    dot_ratio: float = DOT_DIAMETER_RATIO
 
 
 def validate_config(config: PaperClipConfig) -> PaperClipConfig:
@@ -38,6 +47,9 @@ def validate_config(config: PaperClipConfig) -> PaperClipConfig:
         raise ValueError("print_dpi must be at least 300")
     if config.rs_redundancy < 0.05 or config.rs_redundancy > 0.50:
         raise ValueError("rs_redundancy must be between 0.05 and 0.50")
+    tag_scale_index(config.tag_size_mm)
+    qr_scale_index(config.qr_module_mm)
+    dot_ratio_index(config.dot_ratio)
     if config.tag_pitch_mm < TAG_PITCH_MIN_MM or config.tag_pitch_mm > TAG_PITCH_MAX_MM:
         raise ValueError(
             f"tag_pitch_mm must be between {TAG_PITCH_MIN_MM:.0f} and {TAG_PITCH_MAX_MM:.0f}"
@@ -75,7 +87,10 @@ ALGO_FIELDS = (
     "print_dpi",
     "rs_redundancy",
     "tag_pitch_mm",
+    "tag_size_mm",
     "redundancy_pages",
+    "qr_module_mm",
+    "dot_ratio",
 )
 
 
@@ -83,48 +98,11 @@ def default_config() -> PaperClipConfig:
     return validate_config(PaperClipConfig())
 
 
-def resolve_config(
-    num_symbols: int | None = None,
-    cell_size_px: int | None = None,
-    paper_size: str | None = None,
-    print_dpi: int | None = None,
-    rs_redundancy: float | None = None,
-    redundancy_pages: int | None = None,
-    margin_mm: float | None = None,
-    margin_top_mm: float | None = None,
-    margin_right_mm: float | None = None,
-    margin_bottom_mm: float | None = None,
-    margin_left_mm: float | None = None,
-) -> PaperClipConfig:
-    base = default_config()
-    overrides: dict[str, object] = {
-        key: value
-        for key, value in (
-            ("num_symbols", num_symbols),
-            ("cell_size_px", cell_size_px),
-            ("print_dpi", print_dpi),
-            ("rs_redundancy", rs_redundancy),
-            ("redundancy_pages", redundancy_pages),
-        )
-        if value is not None
-    }
-    if margin_mm is not None:
-        overrides["margin_top_mm"] = margin_mm
-        overrides["margin_right_mm"] = margin_mm
-        overrides["margin_bottom_mm"] = margin_mm
-        overrides["margin_left_mm"] = margin_mm
-    for key, value in (
-        ("margin_top_mm", margin_top_mm),
-        ("margin_right_mm", margin_right_mm),
-        ("margin_bottom_mm", margin_bottom_mm),
-        ("margin_left_mm", margin_left_mm),
-    ):
-        if value is not None:
-            overrides[key] = value
-    if paper_size:
-        from common.paper_sizes import config_with_page_dimensions
-        base = config_with_page_dimensions(base, paper_size)
-    return validate_config(replace(base, **overrides) if overrides else base)
+def __getattr__(name: str) -> object:
+    if name == "resolve_config":
+        from common.config_resolve import resolve_config
+        return resolve_config
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def config_from_job_dict(stored: dict) -> PaperClipConfig:

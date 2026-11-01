@@ -19,5 +19,5 @@ def render_calibration_strip(image: Image.Image, config: PaperClipConfig) -> Ima
             color = palette[symbol - 1] if symbol > 0 else None
             x = mx + region.x + symbol * cell
             y = my + region.y + row * cell
-            draw_dot_cell(draw, x, y, cell, color)
+            draw_dot_cell(draw, x, y, cell, color, config.dot_ratio)
     return image

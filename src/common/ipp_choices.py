@@ -73,6 +73,26 @@ def choose_sides(attributes: IppMap) -> str:
     return "one-sided"
 
 
+def choose_sheet_back(attributes: IppMap) -> str:
+    values = _keywords(attributes, "pwg-raster-document-sheet-back")
+    return values[0].lower() if values else "normal"
+
+
+def choose_duplex(attributes: IppMap) -> str | None:
+    supported = _keywords(attributes, "sides-supported")
+    for sides in ("two-sided-long-edge", "two-sided-short-edge"):
+        if sides in supported:
+            return sides
+    return None
+
+
+def require_sides(attributes: IppMap, sides: str) -> str:
+    supported = _keywords(attributes, "sides-supported")
+    if supported and sides not in supported:
+        raise DeviceError(f"printer does not list {sides}")
+    return sides
+
+
 def choose_document(attributes: IppMap) -> tuple[str, int]:
     formats = _keywords(attributes, "document-format-supported")
     if "image/pwg-raster" in formats or not formats:

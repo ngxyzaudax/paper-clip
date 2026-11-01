@@ -45,7 +45,8 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-m 'not slow'"
+addopts = "-m 'not slow and not hardware'"
 markers = [
     "slow: heavier sweeps and neural-net checks",
+    "hardware: print the calibration sheet and scan it on the platen",
 ]

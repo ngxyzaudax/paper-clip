@@ -101,7 +101,9 @@ Footer {
 EncodeScreen,
 DevicesScreen,
 PrintScreen,
-ScanScreen {
+ScanScreen,
+DecodeScreen,
+CalibrateScreen {
     width: 100%;
     height: 100%;
 }

@@ -1,5 +1,6 @@
 import typer
 
+from cli.calibrate_cmd import calibrate_app
 from cli.decode_cmd import decode_command
 from cli.devices_cmd import devices_command
 from cli.encode_cmd import encode_command
@@ -21,6 +22,7 @@ def main_callback(ctx: typer.Context) -> None:
         run_tui()
 
 
+app.add_typer(calibrate_app, name="calibrate")
 app.command("encode")(encode_command)
 app.command("decode")(decode_command)
 app.command("devices")(devices_command)

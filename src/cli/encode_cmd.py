@@ -27,17 +27,27 @@ def encode_command(
     ),
     cell_size_px: int | None = typer.Option(
         None,
-        help="Cell size in pixels (default 32). Presets: 24, 32, 40, 48, 64. Must be at least 0.6 mm.",
+        help="Cell size in pixels. Saved calibration profile, otherwise 22. Must be at least 0.49 mm.",
     ),
     paper_size: str | None = typer.Option(None, help="Paper size (A3, A4, A5, Letter, Legal, etc.)"),
     print_dpi: int | None = typer.Option(None, help="Logical page DPI for layout and print hints"),
-    rs_redundancy: float | None = typer.Option(None, help="Reed–Solomon redundancy (0.05–0.50)"),
+    rs_redundancy: float | None = typer.Option(None, help="Reed–Solomon redundancy (0.05–0.50). Default 0.25."),
     redundancy_pages: int | None = typer.Option(None, help="Extra parity pages (fountain)"),
     margin_mm: float | None = typer.Option(None, help="Uniform page margin in mm (all sides)"),
     margin_top_mm: float | None = typer.Option(None, help="Top page margin in mm"),
     margin_right_mm: float | None = typer.Option(None, help="Right page margin in mm"),
     margin_bottom_mm: float | None = typer.Option(None, help="Bottom page margin in mm"),
     margin_left_mm: float | None = typer.Option(None, help="Left page margin in mm"),
+    tag_pitch_mm: float | None = typer.Option(None, help="AprilTag pitch in millimetres"),
+    tag_size_mm: float | None = typer.Option(
+        None, help="AprilTag size in millimetres. Default 4. Allowed: 8, 6, 5, 4, 3.5, 3, 2.5, or 2",
+    ),
+    qr_module_mm: float | None = typer.Option(
+        None, "--qr-module-mm", help="QR module size in millimetres. Default 0.36",
+    ),
+    dot_ratio: float | None = typer.Option(
+        None, "--dot-ratio", help="Dot diameter as a fraction of the cell. Default 0.62",
+    ),
     password: str | None = typer.Option(
         None,
         help="Passphrase for payload encryption (built-in default key when omitted)",
@@ -52,6 +62,7 @@ def encode_command(
         num_symbols, cell_size_px, paper_size,
         print_dpi, rs_redundancy, redundancy_pages, margin_mm,
         margin_top_mm, margin_right_mm, margin_bottom_mm, margin_left_mm,
+        tag_pitch_mm, tag_size_mm, qr_module_mm, dot_ratio,
     )
 
     from serialization.encode.encoder import prepare_payload

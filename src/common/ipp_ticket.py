@@ -29,6 +29,7 @@ _REQUESTED = (
     "printer-resolution-supported",
     "printer-state",
     "pwg-raster-document-resolution-supported",
+    "pwg-raster-document-sheet-back",
     "pwg-raster-document-type-supported",
     "sides-supported",
 )

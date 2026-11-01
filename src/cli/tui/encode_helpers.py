@@ -81,7 +81,9 @@ def _format_encoding_info_panel_body(config: PaperClipConfig, paper_size: str) -
     return (
         f"[bold cyan]Encoding Parameters[/bold cyan]\n"
         f"  {symbol_option_label(sc)}    Cell: {config.cell_size_px}px\n"
-        f"  Bits/cell: {bpc:.2f}    RS redundancy: {config.rs_redundancy:.0%}\n\n"
+        f"  Bits/cell: {bpc:.2f}    RS redundancy: {config.rs_redundancy:.0%}\n"
+        f"  AprilTag: {config.tag_size_mm:g} mm, pitch {config.tag_pitch_mm:g} mm\n"
+        f"  QR module: {config.qr_module_mm:g} mm    Dot ratio: {config.dot_ratio:g}\n\n"
         f"[bold cyan]Hardware[/bold cyan]\n"
         f"  Print DPI: {config.print_dpi}\n"
         f"{margins_line}"

@@ -1,4 +1,4 @@
-CELL_SIZE_PICK_VALUES: tuple[int, ...] = (24, 32, 40, 48, 64)
+CELL_SIZE_PICK_VALUES: tuple[int, ...] = (14, 15, 16, 17, 18, 20, 22, 24, 32, 40, 48, 64)
 CELL_SIZE_PICK_MIN = CELL_SIZE_PICK_VALUES[0]
 CELL_SIZE_PICK_MAX = CELL_SIZE_PICK_VALUES[-1]
 
@@ -24,7 +24,4 @@ def clamp_cell_size_pick(px: int) -> int:
 
 
 def cell_size_pick_label(px: int) -> str:
-    for label, n in cell_size_pick_options():
-        if n == px:
-            return label
     return f"{px} px"

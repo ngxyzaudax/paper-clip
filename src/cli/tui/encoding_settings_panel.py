@@ -5,13 +5,8 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widget import Widget
 from textual.widgets import Button, Input, Label, Static
 
-from cli.tui.encoding_form import EncodingFormPicks
-from common.cell_size_picks import cell_size_pick_label
-from common.color_picker import symbol_option_label
-from common.paper_sizes import paper_size_option_label
-from common.print_dpi_presets import print_dpi_option_label
-from common.parity_pages_picks import parity_pages_option_label
-from common.rs_redundancy_picks import rs_redundancy_option_label
+from cli.tui.encode_pick_fields import PickField, field_rows
+from cli.tui.encoding_form import EncodingFormPicks, profile_source_text
 
 
 class EncodingSettingsPanel(Widget):
@@ -22,58 +17,22 @@ class EncodingSettingsPanel(Widget):
 
     def compose(self) -> ComposeResult:
         yield Static("Encoding settings", classes="encode-panel-title")
+        yield Static(profile_source_text(self._picks), id="enc-profile-source")
         with Vertical(classes="section"):
             with VerticalScroll(classes="encode-form-scroll"):
+                for row in field_rows():
+                    with Horizontal(classes="form-row"):
+                        for field in row:
+                            yield from self._pick_column(field)
                 with Horizontal(classes="form-row"):
                     with Vertical(classes="form-col"):
-                        yield Label("Symbols")
-                        yield Button(
-                            symbol_option_label(self._picks.symbol_count),
-                            id="enc-symbols-pick",
-                            compact=True,
-                        )
+                        yield Label("Margins mm")
+                        yield Input(value=f"{self._picks.margin_mm:g}", id="enc-margin-input", compact=True)
                     with Vertical(classes="form-col"):
-                        yield Label("Cell px")
-                        yield Button(
-                            cell_size_pick_label(self._picks.cell_size_px),
-                            id="enc-cell-pick",
-                            compact=True,
-                        )
-                with Horizontal(classes="form-row"):
-                    with Vertical(classes="form-col"):
-                        yield Label("Print DPI")
-                        yield Button(
-                            print_dpi_option_label(self._picks.print_dpi),
-                            id="enc-dpi-pick",
-                            compact=True,
-                        )
-                    with Vertical(classes="form-col"):
-                        yield Label("RS redundancy")
-                        yield Button(
-                            rs_redundancy_option_label(self._picks.rs_redundancy),
-                            id="enc-rs-pick",
-                            compact=True,
-                        )
-                with Horizontal(classes="form-row"):
-                    with Vertical(classes="form-col"):
-                        yield Label("Parity pages")
-                        yield Button(
-                            parity_pages_option_label(self._picks.redundancy_pages),
-                            id="enc-parity-pick",
-                            compact=True,
-                        )
-                with Horizontal(classes="form-row"):
-                    with Vertical(classes="form-col"):
-                        yield Label("Margins")
-                        yield Input(
-                            value=f"{self._picks.margin_mm:g}",
-                            id="enc-margin-input",
-                            compact=True,
-                        )
-                    with Vertical(classes="form-col"):
-                        yield Label("Paper size")
-                        yield Button(
-                            paper_size_option_label(self._picks.paper_size),
-                            id="enc-paper-pick",
-                            compact=True,
-                        )
+                        yield Label("Density")
+                        yield Button("Reset to profile", id="enc-use-profile", compact=True)
+
+    def _pick_column(self, field: PickField) -> ComposeResult:
+        with Vertical(classes="form-col"):
+            yield Label(field.label)
+            yield Button(field.describe(getattr(self._picks, field.attribute)), id=field.button_id, compact=True)

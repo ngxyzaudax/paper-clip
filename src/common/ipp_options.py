@@ -9,8 +9,10 @@ from common.ipp_choices import (
     choose_media,
     choose_quality,
     choose_scaling,
+    choose_sheet_back,
     choose_sides,
     choose_source,
+    require_sides,
 )
 from common.ipp_codec import IppMap
 from common.ipp_media import MediaSize
@@ -28,10 +30,14 @@ class PrintTicket(NamedTuple):
     sides: str
     dpi: int
     document_format: str
+    sheet_back: str = "normal"
+    page_index: int = 0
+    page_count: int = 1
 
 
-def build_ticket(attributes: IppMap, paper: str) -> PrintTicket:
+def build_ticket(attributes: IppMap, paper: str, sides: str | None = None) -> PrintTicket:
     document_format, dpi = choose_document(attributes)
+    chosen_sides = choose_sides(attributes) if sides is None else require_sides(attributes, sides)
     ticket = PrintTicket(
         media=choose_media(attributes, paper),
         source=choose_source(attributes),
@@ -39,9 +45,10 @@ def build_ticket(attributes: IppMap, paper: str) -> PrintTicket:
         color=choose_color(attributes),
         quality=choose_quality(attributes),
         scaling=choose_scaling(attributes),
-        sides=choose_sides(attributes),
+        sides=chosen_sides,
         dpi=dpi,
         document_format=document_format,
+        sheet_back=choose_sheet_back(attributes),
     )
     if ticket.margin <= 0 or ticket.scaling != "none" or "borderless" in ticket.media.keyword.lower():
         raise DeviceError("refusing a borderless or fit-to-page ticket")

@@ -4,6 +4,7 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
+from common.escl_caps import choose_dpi
 from common.sane_discovery import get_scanner_capabilities
 from common.types import ScannerCapabilities
 
@@ -81,13 +82,13 @@ def _save_png(image: object, target_path: Path) -> None:
         raise RuntimeError(f"Failed to save scan to {target_path}: {exc}") from exc
 
 
-def capture_scan(device_id: str, target_path: Path) -> ScanCaptureResult:
+def capture_scan(device_id: str, target_path: Path, dpi: int | None = None) -> ScanCaptureResult:
     if not device_id:
         raise ValueError("device_id is required")
     caps = get_scanner_capabilities(device_id)
     if caps is None:
         raise RuntimeError(f"Could not read capabilities for {device_id}")
-    dpi = select_max_dpi(caps)
+    dpi = _chosen_resolution(caps, dpi)
     mode = select_default_mode(caps)
     source = select_default_source(caps)
     sane_module = _ensure_sane_module()
@@ -110,3 +111,9 @@ def capture_scan(device_id: str, target_path: Path) -> ScanCaptureResult:
         device_id, dpi, mode, source, target_path,
     )
     return ScanCaptureResult(target_path=target_path, dpi=dpi, mode=mode, source=source)
+
+
+def _chosen_resolution(caps: ScannerCapabilities, requested: int | None) -> int:
+    if requested is None:
+        return select_max_dpi(caps)
+    return choose_dpi(tuple(caps.resolutions), requested)

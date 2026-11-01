@@ -12,7 +12,7 @@ def capture_page(device_id: str, target: Path, dpi: int | None = None) -> ScanCa
         return _capture_escl(device_id, target, dpi or 1200)
     from common.sane_scan import capture_scan
 
-    return capture_scan(device_id, target)
+    return capture_scan(device_id, target, dpi)
 
 
 def _capture_escl(uri: str, target: Path, dpi: int) -> ScanCaptureResult:

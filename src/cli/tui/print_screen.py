@@ -4,56 +4,22 @@ from functools import partial
 
 from textual import work
 from textual.app import ComposeResult
-from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widget import Widget
-from textual.widgets import Button, Label, Static
+from textual.widgets import Button, Static
 
+from cli.tui.confirm_screen import ConfirmScreen
+from cli.tui.devices_worker import pick_button_label
 from cli.tui.option_picker_screen import OptionPickerScreen
-from cli.tui.print_jobs import PrintJob, discover_print_jobs, job_option_label
-from cli.tui.devices_worker import discover_printers
-from common.device_config import get_printer_settings
-from common.ipp_media import MEDIA_SIZES
-from common.ipp_print import print_pages
+from cli.tui.print_form import PrintForm, load_print_form, submit_print_job
+from cli.tui.print_jobs import PrintJob
+from cli.tui.print_screen_layout import DUPLEX_OPTIONS, compose_print_screen, duplex_label, format_job_details
+from cli.tui.print_screen_state import find_job, preferred_job, print_confirm_body
 from common.types import PrinterInfo
-
-
-def _pick_label(
-    options: list[tuple[str, str]],
-    value: str | None,
-    empty_label: str,
-) -> str:
-    if not options:
-        return empty_label
-    if not value:
-        return "[dim]Select…[/dim]"
-    for label, key in options:
-        if key == value:
-            return label
-    return value
-
-
-def _format_job_details(job: PrintJob | None) -> str:
-    if job is None:
-        return "[dim]Select a job to preview pages[/dim]"
-    page_lines = "\n".join(f"  - {p.name}" for p in job.page_paths[:20])
-    if len(job.page_paths) > 20:
-        page_lines += f"\n  ... ({len(job.page_paths) - 20} more)"
-    source = job.source_file if job.source_file else "(unknown source)"
-    created = job.created if job.created else "(unknown)"
-    paper = job.paper_size if job.paper_size else "(unknown)"
-    return (
-        f"[bold]Job[/bold]: {job.job_id}\n"
-        f"[bold]Source[/bold]: {source}\n"
-        f"[bold]Created[/bold]: {created}\n"
-        f"[bold]Paper[/bold]: {paper}\n"
-        f"[bold]Pages[/bold]: {len(job.page_paths)}\n\n"
-        f"[bold]Files[/bold]\n{page_lines}"
-    )
 
 
 class PrintScreen(Widget):
 
-    def __init__(self) -> None:
+    def __init__(self, job_id: str | None = None) -> None:
         super().__init__()
         self._printers: list[PrinterInfo] = []
         self._jobs: list[PrintJob] = []
@@ -61,52 +27,12 @@ class PrintScreen(Widget):
         self._job_options: list[tuple[str, str]] = []
         self._printer_name: str | None = None
         self._job_id: str | None = None
+        self._wanted_job = job_id
+        self._duplex: bool = False
+        self._sending = False
 
     def compose(self) -> ComposeResult:
-        with Vertical(classes="encode-screen-layout form-container"):
-            with Horizontal(classes="encode-split"):
-                with Vertical(classes="encode-form-col"):
-                    yield Static("Print jobs", classes="encode-panel-title")
-                    with Vertical(classes="section"):
-                        with VerticalScroll(classes="encode-form-scroll"):
-                            with Horizontal(classes="form-row"):
-                                with Vertical(classes="form-col"):
-                                    yield Label("Printer")
-                                    yield Button(
-                                        "[dim]Discovering…[/dim]",
-                                        id="print-printer-pick",
-                                        compact=True,
-                                        disabled=True,
-                                    )
-                            with Horizontal(classes="form-row"):
-                                with Vertical(classes="form-col"):
-                                    yield Label("Job")
-                                    yield Button(
-                                        "[dim]Discovering…[/dim]",
-                                        id="print-job-pick",
-                                        compact=True,
-                                        disabled=True,
-                                    )
-                with Vertical(classes="encode-info-col"):
-                    yield Static("Job details", classes="encode-panel-title")
-                    with Vertical(classes="section"):
-                        with VerticalScroll(classes="encode-info-scroll"):
-                            yield Static(
-                                "[dim]Loading jobs…[/dim]",
-                                id="print-job-details",
-                                classes="details-panel",
-                            )
-            with VerticalScroll(classes="encode-bottom-scroll"):
-                with Horizontal(classes="button-bar"):
-                    yield Button("Refresh", id="btn-print-refresh", compact=True)
-                    yield Button(
-                        "Print Job",
-                        id="btn-print-submit",
-                        variant="primary",
-                        compact=True,
-                        disabled=True,
-                    )
-                yield Static("", id="print-status")
+        yield from compose_print_screen()
 
     def on_mount(self) -> None:
         self._discover()
@@ -115,116 +41,95 @@ class PrintScreen(Widget):
         bid = event.button.id
         if bid == "btn-print-refresh":
             self._discover()
-        elif bid == "print-printer-pick":
-            if self._printer_options:
-                self.app.push_screen(
-                    OptionPickerScreen("Printer", self._printer_options),
-                    partial(self._on_option_picked, "printer"),
-                )
-        elif bid == "print-job-pick":
-            if self._job_options:
-                self.app.push_screen(
-                    OptionPickerScreen("Job", self._job_options),
-                    partial(self._on_option_picked, "job"),
-                )
+        elif bid == "print-printer-pick" and self._printer_options:
+            self._pick("Printer", self._printer_options, "printer")
+        elif bid == "print-job-pick" and self._job_options:
+            self._pick("Job", self._job_options, "job")
+        elif bid == "print-duplex-pick":
+            self._pick("Duplex", DUPLEX_OPTIONS, "duplex")
         elif bid == "btn-print-submit":
-            self._print_selected_job()
+            self._confirm_print()
+
+    def _pick(self, title: str, options: list[tuple[str, str]], kind: str) -> None:
+        self.app.push_screen(OptionPickerScreen(title, options), partial(self._on_option_picked, kind))
 
     def _on_option_picked(self, kind: str, result: object | None) -> None:
         if result is None:
             return
         if kind == "printer":
             self._printer_name = str(result)
-        else:
+        elif kind == "job":
             self._job_id = str(result)
-        self._refresh_labels()
-        self._refresh_details()
-        self._refresh_actions()
+        elif kind == "duplex":
+            self._duplex = result == "on"
+        self._refresh()
 
     @work(thread=True)
     def _discover(self) -> None:
-        self.app.call_from_thread(
-            self.query_one("#print-status", Static).update,
-            "[bold]Discovering printers and jobs...[/bold]",
-        )
-        held: list[PrinterInfo] = []
-        printer_options, printer_name = discover_printers(held)
-        printers = held
-        jobs = discover_print_jobs()
-        saved_printer = str(get_printer_settings().get("uri", ""))
-        if saved_printer and any(uri == saved_printer for _, uri in printer_options):
-            printer_name = saved_printer
+        self._status_from_thread("[bold]Discovering printers and jobs...[/bold]")
+        form = load_print_form()
+        self.app.call_from_thread(self._apply_form, form)
 
-        job_options = [(job_option_label(job), job.job_id) for job in jobs]
-        job_id = job_options[0][1] if job_options else None
-
-        def _update() -> None:
-            self._printers = printers
-            self._jobs = jobs
-            self._printer_options = printer_options
-            self._job_options = job_options
-            self._printer_name = printer_name
-            self._job_id = job_id
-            self._refresh_labels()
-            self._refresh_details()
-            self._refresh_actions()
-            self.query_one("#print-status", Static).update("")
-
-        self.app.call_from_thread(_update)
+    def _apply_form(self, form: PrintForm) -> None:
+        self._printers = form.printers
+        self._jobs = form.jobs
+        self._printer_options = form.printer_options
+        self._job_options = form.job_options
+        self._printer_name = form.printer_name
+        self._job_id = preferred_job(form.job_options, self._wanted_job, form.job_id)
+        self._refresh()
+        self._status("")
 
     def _selected_job(self) -> PrintJob | None:
-        if not self._job_id:
-            return None
-        for job in self._jobs:
-            if job.job_id == self._job_id:
-                return job
-        return None
+        return find_job(self._jobs, self._job_id)
+
+    def _refresh(self) -> None:
+        self._refresh_labels()
+        self.query_one("#print-job-details", Static).update(format_job_details(self._selected_job(), self._duplex))
+        can_print = self._printer_name is not None and self._selected_job() is not None
+        self.query_one("#btn-print-submit", Button).disabled = self._sending or not can_print
 
     def _refresh_labels(self) -> None:
         printer_btn = self.query_one("#print-printer-pick", Button)
         job_btn = self.query_one("#print-job-pick", Button)
-        printer_btn.label = _pick_label(
-            self._printer_options,
-            self._printer_name,
-            "[dim]No printers found[/dim]",
+        printer_btn.label = pick_button_label(
+            self._printer_options, self._printer_name, absent_message="[dim]No printers found[/dim]",
         )
-        job_btn.label = _pick_label(
-            self._job_options,
-            self._job_id,
-            "[dim]No jobs found[/dim]",
-        )
+        job_btn.label = pick_button_label(self._job_options, self._job_id, absent_message="[dim]No jobs found[/dim]")
+        self.query_one("#print-duplex-pick", Button).label = duplex_label(self._duplex)
         printer_btn.disabled = not self._printer_options
         job_btn.disabled = not self._job_options
 
-    def _refresh_details(self) -> None:
-        self.query_one("#print-job-details", Static).update(
-            _format_job_details(self._selected_job()),
+    def _confirm_print(self) -> None:
+        job, printer = self._selected_job(), self._printer_name
+        if job is None or not printer or self._sending:
+            return
+        self.app.push_screen(
+            ConfirmScreen("Print this job?", print_confirm_body(job, printer, self._duplex), "Print"),
+            lambda ok: self._start_print(job, printer) if ok else None,
         )
 
-    def _refresh_actions(self) -> None:
-        can_print = self._printer_name is not None and self._selected_job() is not None
-        self.query_one("#btn-print-submit", Button).disabled = not can_print
+    def _start_print(self, job: PrintJob, printer: str) -> None:
+        self._sending = True
+        self._refresh()
+        self._status("[bold]Submitting print job...[/bold]")
+        self._print_job(job, printer, self._duplex)
 
     @work(thread=True)
-    def _print_selected_job(self) -> None:
-        job = self._selected_job()
-        printer = self._printer_name
-        if job is None or not printer:
-            return
-        self.app.call_from_thread(
-            self.query_one("#print-status", Static).update,
-            "[bold]Submitting print job...[/bold]",
-        )
+    def _print_job(self, job: PrintJob, printer: str, duplex: bool) -> None:
         try:
-            paper = job.paper_size if job.paper_size in MEDIA_SIZES else "A4"
-            ids = print_pages(printer, list(job.page_paths), f"paper-clip {job.job_id}", paper)
-            ids_text = ", ".join(str(i) for i in ids)
-            self.app.call_from_thread(
-                self.query_one("#print-status", Static).update,
-                f"[bold green]Submitted {len(ids)} page(s) to {printer}. Job IDs: {ids_text}[/bold green]",
-            )
+            message = submit_print_job(printer, job, duplex)
         except Exception as exc:
-            self.app.call_from_thread(
-                self.query_one("#print-status", Static).update,
-                f"[red]Print error: {exc}[/red]",
-            )
+            message = f"[red]Print error: {exc}[/red]"
+        self.app.call_from_thread(self._print_done, message)
+
+    def _print_done(self, message: str) -> None:
+        self._sending = False
+        self._refresh()
+        self._status(message)
+
+    def _status(self, message: str) -> None:
+        self.query_one("#print-status", Static).update(message)
+
+    def _status_from_thread(self, message: str) -> None:
+        self.app.call_from_thread(self._status, message)

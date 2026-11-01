@@ -26,7 +26,7 @@ def scan_jpeg(uri: str, dpi: int, timeout: float | None = None) -> tuple[bytes, 
     job = _absolute(uri, location)
     chosen = _chosen_dpi(settings)
     try:
-        image = _next_document(job, timeout or (45 if chosen <= 150 else 240))
+        image = _next_document(job, _document_wait(chosen) if timeout is None else timeout)
     finally:
         _delete_job(job)
     logger.info("eSCL scan complete: %s dpi=%s bytes=%s", uri, chosen, len(image))
@@ -76,6 +76,13 @@ def _absolute(base: str, location: str) -> str:
 def _origin(uri: str) -> str:
     parts = urlsplit(uri)
     return f"{parts.scheme}://{parts.netloc}"
+
+
+def _document_wait(dpi: int) -> float:
+    if dpi <= 150:
+        return 45
+    ratio = dpi / 1200
+    return max(240.0, 240.0 * ratio * ratio)
 
 
 def _chosen_dpi(settings: bytes) -> int:

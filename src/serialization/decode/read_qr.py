@@ -5,14 +5,18 @@ import struct
 import cv2
 import numpy as np
 
+from common.format_spec import qr_module_count
 from serialization.decode.errors import DecodeError
 from serialization.decode.qr_bend import bent_qr_retry
 from serialization.encode.qr_header import DecodedQrHeader, decode_header_bytes
 
+_MODULE_PX = 8
+_QUIET_PX = 16
+
 
 def read_qr_header(image: np.ndarray) -> tuple[np.ndarray, DecodedQrHeader, np.ndarray | None]:
     detectors = _detectors()
-    found = _first_header(image, (image,), detectors)
+    found = _first_header(image, (image,), detectors) or _window_header(image, detectors)
     if found is not None:
         return found
     rescued = bent_qr_retry(image, detectors, _header_from_text)
@@ -55,12 +59,51 @@ def _views(image: np.ndarray) -> tuple[np.ndarray, ...]:
     return image, boosted, blurred
 
 
+def _window_header(
+    image: np.ndarray, detectors: tuple[object, ...],
+) -> tuple[np.ndarray, DecodedQrHeader, np.ndarray | None] | None:
+    for x_px, y_px, crop in _windows(image):
+        found = _first_header(image, (crop,), detectors)
+        if found is None:
+            continue
+        _rotated, header, points = found
+        if points is None:
+            continue
+        return image, header, points + np.array([x_px, y_px], np.float32)
+    return None
+
+
+def _windows(image: np.ndarray) -> tuple[tuple[int, int, np.ndarray], ...]:
+    height, width = image.shape[:2]
+    side = min(height, width, max(1600, int(min(height, width) * 0.45)))
+    center = (max(0, (width - side) // 2), max(0, (height - side) // 2))
+    corners = (
+        (0, 0),
+        (max(0, width - side), 0),
+        (0, max(0, height - side)),
+        (max(0, width - side), max(0, height - side)),
+    )
+    origins = (center, *(item for item in corners if item != center))
+    return tuple((x_px, y_px, image[y_px:y_px + side, x_px:x_px + side]) for x_px, y_px in origins)
+
+
 def _detect(detector: object, image: np.ndarray) -> tuple[str, np.ndarray | None]:
     bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
     result = detector.detectAndDecode(bgr)
-    text = result[0] if result else ""
-    points = None if len(result) < 2 or result[1] is None else np.asarray(result[1], np.float32).reshape(-1, 2)
-    return str(text or ""), points
+    text = str(result[0] or "") if result else ""
+    points = None if not result or len(result) < 2 or result[1] is None else np.asarray(result[1], np.float32).reshape(-1, 2)
+    if text or points is None or len(points) != 4:
+        return text, points
+    return _text_with_quiet_zone(detector, bgr, points) or text, points
+
+
+def _text_with_quiet_zone(detector: object, image: np.ndarray, points: np.ndarray) -> str:
+    side = qr_module_count() * _MODULE_PX
+    dest = np.array([[0, 0], [side - 1, 0], [side - 1, side - 1], [0, side - 1]], np.float32)
+    warped = cv2.warpPerspective(image, cv2.getPerspectiveTransform(points, dest), (side, side), flags=cv2.INTER_CUBIC)
+    padded = cv2.copyMakeBorder(warped, _QUIET_PX, _QUIET_PX, _QUIET_PX, _QUIET_PX, cv2.BORDER_CONSTANT, value=(255, 255, 255))
+    result = detector.detectAndDecode(padded)
+    return str(result[0] or "") if result else ""
 
 
 def _detectors() -> tuple[object, ...]:

@@ -11,7 +11,7 @@ def calibration_offset_and_refs(
 ) -> tuple[int, int, np.ndarray]:
     ideal = np.asarray(blank_and_palette(config), np.float32)
     ideal_lab = rgb_to_lab(ideal)
-    radius = sample_radius(geometry.cell)
+    radius = sample_radius(geometry.cell, config.dot_ratio)
     strip_dx, strip_dy = _strip_shift(image, geometry, config.num_symbols, radius, ideal_lab)
     refs = _references(image, geometry, config.num_symbols, strip_dx, strip_dy, radius, ideal)
     return 0, 0, refs

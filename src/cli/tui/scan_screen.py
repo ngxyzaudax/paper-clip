@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from functools import partial
 from pathlib import Path
 
 from textual import work
@@ -8,31 +7,19 @@ from textual.app import ComposeResult
 from textual.widget import Widget
 from textual.widgets import Button, Static
 
+from cli.tui.nav_messages import OpenPanel
 from cli.tui.option_picker_screen import OptionPickerScreen
-from cli.tui.scan_jobs import (
-    ScanJobContext,
-    next_scan_path,
-    start_scan_job,
-    update_scan_job_metadata,
-)
+from cli.tui.scan_jobs import ScanJobContext
 from cli.tui.scan_screen_layout import compose_scan_screen, format_scanner_state
-from cli.tui.scan_worker import (
-    discover_scanners_for_scan,
-    label_for_device,
-    resolve_max_dpi,
-)
-from common.device_config import get_scanner_settings
-from common.scan_capture import capture_page
+from cli.tui.scan_screen_workers import discover_into, scan_page_into, start_job_into
+from cli.tui.scan_worker import label_for_device
 
 
-def _pick_label(
-    options: list[tuple[str, str]],
-    value: str | None,
-) -> str:
+def _pick_label(options: list[tuple[str, str]], value: str | None) -> str:
     if not options:
         return "[dim]No scanners found[/dim]"
     if not value:
-        return "[dim]Select…[/dim]"
+        return "[dim]Select...[/dim]"
     return label_for_device(options, value)
 
 
@@ -46,6 +33,7 @@ class ScanScreen(Widget):
         self._job: ScanJobContext | None = None
         self._page_count: int = 0
         self._last_saved: str = ""
+        self._finished_job_id: str | None = None
 
     def compose(self) -> ComposeResult:
         yield from compose_scan_screen()
@@ -58,149 +46,84 @@ class ScanScreen(Widget):
         if bid == "btn-scan-refresh":
             self._discover()
         elif bid == "scan-scanner-pick" and self._scanner_options:
-            self.app.push_screen(
-                OptionPickerScreen("Scanner", self._scanner_options),
-                partial(self._on_scanner_picked),
-            )
-        elif bid == "btn-scan-start":
-            self._start_job()
-        elif bid == "btn-scan-next":
-            self._scan_next_page()
+            self.app.push_screen(OptionPickerScreen("Scanner", self._scanner_options), self._on_scanner_picked)
+        elif bid == "btn-scan-start" and self._scanner_device and self._job is None:
+            self.set_status("[bold]Starting the scan job (resolving the maximum DPI)...[/bold]")
+            self._start_job(self._scanner_device)
+        elif bid == "btn-scan-next" and self._job is not None and self._scanner_device:
+            self.query_one("#btn-scan-next", Button).disabled = True
+            self._scan_next_page(self._job, self._scanner_device, self._max_dpi)
         elif bid == "btn-scan-finish":
             self._finish_job()
+        elif bid == "btn-scan-decode" and self._finished_job_id:
+            self.post_message(OpenPanel("nav-decode", self._finished_job_id))
 
     def _on_scanner_picked(self, result: object | None) -> None:
         if result is None:
             return
         self._scanner_device = str(result)
         self._max_dpi = None
-        self._refresh_labels()
-        self._refresh_actions()
-        self._refresh_details()
+        self._refresh()
 
     @work(thread=True)
     def _discover(self) -> None:
-        self._set_status_threadsafe("[bold]Discovering scanners…[/bold]")
-        options, initial = discover_scanners_for_scan()
-
-        def _update() -> None:
-            self._scanner_options = options
-            self._scanner_device = initial
-            self._max_dpi = None
-            self._job = None
-            self._page_count = 0
-            self._last_saved = ""
-            self._refresh_labels()
-            self._refresh_details()
-            self._refresh_actions()
-            empty = "[yellow]No scanners detected.[/yellow]" if not options else ""
-            self._set_status(empty)
-
-        self.app.call_from_thread(_update)
-
-    def _start_job(self) -> None:
-        device = self._scanner_device
-        if not device or self._job is not None:
-            return
-        self._set_status("[bold]Starting scan job (resolving max DPI)…[/bold]")
-        self._start_job_worker(device)
+        discover_into(self)
 
     @work(thread=True)
-    def _start_job_worker(self, device: str) -> None:
-        max_dpi = resolve_max_dpi(device)
-        if max_dpi is None:
-            saved_dpi = int(get_scanner_settings().get("dpi", 0) or 0)
-            max_dpi = saved_dpi if saved_dpi > 0 else 0
-        if max_dpi <= 0:
-            self._set_status_threadsafe(
-                "[red]Could not resolve scanner DPI. Verify scanner is online.[/red]",
-            )
-            return
-        try:
-            ctx = start_scan_job(device, max_dpi)
-        except Exception as exc:
-            self._set_status_threadsafe(f"[red]Could not start job: {exc}[/red]")
-            return
-
-        def _update() -> None:
-            self._job = ctx
-            self._max_dpi = max_dpi
-            self._page_count = 0
-            self._last_saved = ""
-            self._refresh_details()
-            self._refresh_actions()
-            self._set_status(
-                f"[green]Started scan job {ctx.job_id} at {max_dpi} DPI[/green]",
-            )
-
-        self.app.call_from_thread(_update)
+    def _start_job(self, device: str) -> None:
+        start_job_into(self, device)
 
     @work(thread=True)
-    def _scan_next_page(self) -> None:
-        job = self._job
-        device = self._scanner_device
-        if job is None or not device:
-            return
-        target = next_scan_path(job.job_dir)
-        self._set_status_threadsafe(
-            f"[bold]Scanning page {target.stem}… (max DPI={self._max_dpi})[/bold]",
-        )
-        try:
-            result = capture_page(device, target, self._max_dpi)
-        except Exception as exc:
-            self._set_status_threadsafe(f"[red]Scan failed: {exc}[/red]")
-            return
-        try:
-            update_scan_job_metadata(job.job_dir, result.dpi, result.mode)
-        except Exception:
-            pass
+    def _scan_next_page(self, job: ScanJobContext, device: str, max_dpi: int | None) -> None:
+        scan_page_into(self, job, device, max_dpi)
 
-        def _update() -> None:
-            self._page_count += 1
-            self._last_saved = str(result.target_path)
-            self._refresh_details()
-            self._refresh_actions()
-            self._set_status(
-                f"[green]Saved {Path(result.target_path).name} at {result.dpi} DPI[/green]",
-            )
+    def apply_discovery(self, options: list[tuple[str, str]], initial: str | None) -> None:
+        self._scanner_options, self._scanner_device = options, initial
+        self._max_dpi, self._job, self._page_count, self._last_saved = None, None, 0, ""
+        self._refresh()
+        self.set_status("" if options else "[yellow]No scanners detected.[/yellow]")
 
-        self.app.call_from_thread(_update)
+    def apply_started(self, job: ScanJobContext, max_dpi: int) -> None:
+        self._job, self._max_dpi, self._page_count, self._last_saved = job, max_dpi, 0, ""
+        self._refresh()
+        self.set_status(f"[green]Started scan job {job.job_id} at {max_dpi} DPI. Place page 1 and press Scan Next Page.[/green]")
+
+    def apply_scanned(self, path: Path, dpi: int) -> None:
+        self._page_count += 1
+        self._last_saved = str(path)
+        self._refresh()
+        self.set_status(f"[green]Saved {path.name} at {dpi} DPI. Place the next page, or press Finish.[/green]")
+
+    def apply_scan_failed(self, message: str) -> None:
+        self._refresh()
+        self.set_status(message)
 
     def _finish_job(self) -> None:
         if self._job is None:
             return
-        finished_id = self._job.job_id
-        self._job = None
-        self._page_count = 0
-        self._last_saved = ""
-        self._refresh_details()
-        self._refresh_actions()
-        self._set_status(f"[green]Finished scan job {finished_id}[/green]")
+        finished, pages = self._job.job_id, self._page_count
+        self._finished_job_id = finished if pages else self._finished_job_id
+        self._job, self._page_count, self._last_saved = None, 0, ""
+        self._refresh()
+        hint = " Press Decode this job to read it back." if pages else ""
+        self.set_status(f"[green]Finished scan job {finished} with {pages} page(s).{hint}[/green]")
 
-    def _refresh_labels(self) -> None:
-        btn = self.query_one("#scan-scanner-pick", Button)
-        btn.label = _pick_label(self._scanner_options, self._scanner_device)
-        btn.disabled = not self._scanner_options
-
-    def _refresh_details(self) -> None:
-        text = format_scanner_state(
+    def _refresh(self) -> None:
+        button = self.query_one("#scan-scanner-pick", Button)
+        button.label = _pick_label(self._scanner_options, self._scanner_device)
+        button.disabled = not self._scanner_options
+        self.query_one("#scan-job-details", Static).update(format_scanner_state(
             scanner_label=label_for_device(self._scanner_options, self._scanner_device),
             max_dpi=self._max_dpi,
             job_id=self._job.job_id if self._job else None,
             page_count=self._page_count,
             last_path=self._last_saved,
-        )
-        self.query_one("#scan-job-details", Static).update(text)
-
-    def _refresh_actions(self) -> None:
-        has_scanner = self._scanner_device is not None
-        has_job = self._job is not None
+        ))
+        has_scanner, has_job = self._scanner_device is not None, self._job is not None
         self.query_one("#btn-scan-start", Button).disabled = (not has_scanner) or has_job
         self.query_one("#btn-scan-next", Button).disabled = not (has_scanner and has_job)
         self.query_one("#btn-scan-finish", Button).disabled = not has_job
+        self.query_one("#btn-scan-decode", Button).disabled = self._finished_job_id is None
 
-    def _set_status(self, text: str) -> None:
+    def set_status(self, text: str) -> None:
         self.query_one("#scan-status", Static).update(text)
-
-    def _set_status_threadsafe(self, text: str) -> None:
-        self.app.call_from_thread(self.query_one("#scan-status", Static).update, text)
