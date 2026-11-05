@@ -3,7 +3,7 @@ from functools import lru_cache
 
 from common.config import PaperClipConfig
 from common.geometry import page_geometry
-from common.valid_cells import count_valid_cells_row_major, valid_cells_row_major
+from common.header_cells import split_cells
 from common.symbols import chunk_params
 
 
@@ -14,18 +14,12 @@ def grid_dimensions(config: PaperClipConfig) -> tuple[int, int]:
 
 @lru_cache(maxsize=128)
 def data_capacity_symbols(config: PaperClipConfig) -> int:
-    geometry = page_geometry(config)
-    return count_valid_cells_row_major(
-        geometry.cols, geometry.rows, geometry.cell, list(geometry.forbidden),
-    )
+    return len(split_cells(config)[1])
 
 
 @lru_cache(maxsize=32)
 def valid_cells_ordered(config: PaperClipConfig) -> list[tuple[int, int]]:
-    geometry = page_geometry(config)
-    return valid_cells_row_major(
-        geometry.cols, geometry.rows, geometry.cell, list(geometry.forbidden),
-    )
+    return split_cells(config)[1]
 
 
 def data_capacity_bytes(config: PaperClipConfig) -> int:

@@ -8,7 +8,7 @@ def resolve_config(
     cell_size_px: int | None = None,
     paper_size: str | None = None,
     print_dpi: int | None = None,
-    rs_redundancy: float | None = None,
+    ecc_sym: int | None = None,
     redundancy_pages: int | None = None,
     margin_mm: float | None = None,
     margin_top_mm: float | None = None,
@@ -24,7 +24,7 @@ def resolve_config(
 ) -> PaperClipConfig:
     base = default_config()
     overrides = _overrides(
-        num_symbols, cell_size_px, print_dpi, rs_redundancy, redundancy_pages,
+        num_symbols, cell_size_px, print_dpi, ecc_sym, redundancy_pages,
         tag_pitch_mm, tag_size_mm, page_width_mm, page_height_mm, qr_module_mm, dot_ratio,
     )
     overrides.update(_margins(margin_mm, margin_top_mm, margin_right_mm, margin_bottom_mm, margin_left_mm))
@@ -38,7 +38,7 @@ def _overrides(
     num_symbols: int | None,
     cell_size_px: int | None,
     print_dpi: int | None,
-    rs_redundancy: float | None,
+    ecc_sym: int | None,
     redundancy_pages: int | None,
     tag_pitch_mm: float | None,
     tag_size_mm: float | None,
@@ -51,7 +51,7 @@ def _overrides(
         ("num_symbols", num_symbols),
         ("cell_size_px", cell_size_px),
         ("print_dpi", print_dpi),
-        ("rs_redundancy", rs_redundancy),
+        ("ecc_sym", ecc_sym),
         ("redundancy_pages", redundancy_pages),
         ("tag_pitch_mm", tag_pitch_mm),
         ("tag_size_mm", tag_size_mm),

@@ -3,6 +3,7 @@ import numpy as np
 
 from common.format_spec import QR_BORDER_MODULES, qr_module_count
 from common.geometry import PageGeometry
+from common.geometry_types import HeaderSlot
 
 
 def homography(src: np.ndarray, dst: np.ndarray) -> np.ndarray:
@@ -28,12 +29,12 @@ def warp_global(image: np.ndarray, matrix: np.ndarray, width: int, height: int) 
     )
 
 
-def qr_code_corners(geometry: PageGeometry) -> np.ndarray:
+def qr_code_corners(geometry: PageGeometry, slot: HeaderSlot) -> np.ndarray:
     modules = qr_module_count()
-    border = geometry.qr.width * QR_BORDER_MODULES / modules
-    x = float(geometry.origin_x + geometry.qr.x) + border
-    y = float(geometry.origin_y + geometry.qr.y) + border
-    side = float(geometry.qr.width) - 2.0 * border
+    border = slot.qr.width * QR_BORDER_MODULES / modules
+    x = float(geometry.origin_x + slot.qr.x) + border
+    y = float(geometry.origin_y + slot.qr.y) + border
+    side = float(slot.qr.width) - 2.0 * border
     return np.array([[x, y], [x + side, y], [x + side, y + side], [x, y + side]], np.float32)
 
 

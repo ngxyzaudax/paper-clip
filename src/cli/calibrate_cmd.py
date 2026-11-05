@@ -13,11 +13,10 @@ from calibration.sheet_session import archive_session, next_scan_path, save_chos
 from calibration.sheet_sim import simulate_limits
 from calibration.scan_record import scan_record
 from cli.calibrate_output import confirm_or_exit, require_clean, require_sheet, show_limits
-from cli.calibrate_scan import dpi_to_use, scanner_to_use
 from cli.display import print_error, print_success
-from cli.print_cmd import _saved_or_only_printer
 from common.device_error import DeviceError
 from common.scan_capture import capture_page
+from workflows.device_pick import dpi_to_use, saved_or_only_printer, scanner_to_use
 
 calibrate_app = typer.Typer(help="Measure QR, AprilTag, dot, and symbol limits on one duplex A4 sheet.")
 _SESSION_HELP = "A scan or a directory. Default: data/calibration/session"
@@ -62,7 +61,7 @@ def print_command(
 
     folder = require_sheet()
     try:
-        printer = printer_uri or _saved_or_only_printer()
+        printer = printer_uri or saved_or_only_printer()
         confirm_or_exit(yes, f"Send one duplex calibration job to {printer}?")
         job = print_calibration_sheet(printer, folder / "front.png", folder / "back.png", typer.echo)
     except DeviceError as exc:

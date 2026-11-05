@@ -4,8 +4,8 @@ import pytest
 import typer
 
 from cli.print_cmd import _saved_or_only_printer, print_command
-from cli.tui.print_form import submit_print_job
-from cli.tui.print_jobs import PrintJob
+from workflows.print_jobs import PrintJob
+from workflows.print_submit import submit_print_job
 from common.types import PrinterInfo
 
 
@@ -123,7 +123,7 @@ def test_tui_print_threads_the_duplex_option(monkeypatch, tmp_path: Path) -> Non
         seen["title"] = title
         return [4]
 
-    monkeypatch.setattr("cli.tui.print_form.print_pages", fake_print)
+    monkeypatch.setattr("workflows.print_submit.print_pages", fake_print)
     job = PrintJob("job-1", "notes.txt", "now", "A4", pages)
     enabled = submit_print_job("ipp://printer.example/ipp/print", job, True)
     assert seen == {
@@ -135,7 +135,7 @@ def test_tui_print_threads_the_duplex_option(monkeypatch, tmp_path: Path) -> Non
     assert "both sides" in enabled
     disabled = submit_print_job("ipp://printer.example/ipp/print", job, False)
     assert seen["duplex"] is False
-    assert disabled == "[bold green]Submitted 1 page(s) to ipp://printer.example/ipp/print. Job IDs: 4[/bold green]"
+    assert disabled == "Submitted 2 page(s) to ipp://printer.example/ipp/print. Job IDs: 4"
 
 
 def _page(directory: Path, name: str) -> Path:

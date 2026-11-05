@@ -1,7 +1,10 @@
 import json
 import logging
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
+
+from common.json_file import JsonObject, update_json_object
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +29,8 @@ def create_print_job(
     data_pages: int,
     payload_bytes: int,
     data_capacity_bytes_per_page: int,
+    original_sha256: str = "",
+    sides: int = 1,
 ) -> Path:
     job_id = _generate_job_id(source_filename)
     job_dir = PRINT_JOBS_DIR / job_id
@@ -44,6 +49,9 @@ def create_print_job(
         "payload_bytes": payload_bytes,
         "data_capacity_bytes_per_page": data_capacity_bytes_per_page,
         "max_payload_bytes_for_data_pages": max_payload_bytes,
+        "original_sha256": original_sha256,
+        "sides": sides,
+        "prints": [],
         "created": datetime.now().isoformat(),
     }
     (job_dir / "job.json").write_text(json.dumps(metadata, indent=2))
@@ -72,6 +80,31 @@ def create_scan_job(
     (job_dir / "job.json").write_text(json.dumps(metadata, indent=2))
     logger.info("Created scan job %s at %s", job_id, job_dir)
     return job_dir
+
+
+def record_print(job_dir: Path, printer: str, duplex: bool, ipp_job_ids: list[int]) -> None:
+    path = job_dir / "job.json"
+    if not path.is_file():
+        return
+    update_json_object(path, _with_print(printer, duplex, ipp_job_ids))
+    logger.info("Recorded print of %s on %s", job_dir.name, printer)
+
+
+def _with_print(printer: str, duplex: bool, ipp_job_ids: list[int]) -> Callable[[JsonObject], JsonObject]:
+    def change(meta: JsonObject) -> JsonObject:
+        return {**meta, "prints": [*_print_rows(meta), _print_row(printer, duplex, ipp_job_ids)]}
+    return change
+
+
+def _print_rows(meta: JsonObject) -> list[object]:
+    found = meta.get("prints", [])
+    if isinstance(found, list):
+        return list(found)
+    return []
+
+
+def _print_row(printer: str, duplex: bool, ipp_job_ids: list[int]) -> dict[str, object]:
+    return {"time": datetime.now().isoformat(), "printer": printer, "duplex": duplex, "ipp_job_ids": ipp_job_ids}
 
 
 def digital_dir(job_dir: Path) -> Path:

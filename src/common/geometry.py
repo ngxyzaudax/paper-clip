@@ -1,12 +1,14 @@
 from functools import lru_cache
 
 from common.config import PaperClipConfig
+from common.drawing import dot_radius_px
 from common.format_spec import CALIBRATION_REPEATS, QR_SCALE_MM, TAG_SCALE_MM
 from common.qr_scale import qr_scale_index
 from common.tag_scale import tag_scale_index
-from common.geometry_centre import centre_block
 from common.geometry_measure import margin_px, mm_to_px, quantize_mm, snap_down
+from common.geometry_seat import CLEARANCE_MM, seat_slots
 from common.geometry_shift import clear_tags, tag_box
+from common.geometry_slots import header_slots
 from common.geometry_tags import choose_tag_grid, place_tags, tag_pixel_size, tag_quiet_px
 from common.geometry_types import PageGeometry, TagMark
 from common.types import Region
@@ -37,12 +39,13 @@ def _geometry_key(config: PaperClipConfig) -> tuple[float | int, ...]:
         quantize_mm(config.margin_left_mm),
         tag_scale_index(config.tag_size_mm),
         qr_scale_index(config.qr_module_mm),
+        round(float(config.dot_ratio), 4),
     )
 
 
 @lru_cache(maxsize=64)
 def _page_geometry_cached(key: tuple[float | int, ...]) -> PageGeometry:
-    symbols, cell, dpi, pitch_mm, page_w_mm, page_h_mm, top, right, bottom, left, tag_index, qr_index = key
+    symbols, cell, dpi, pitch_mm, page_w_mm, page_h_mm, top, right, bottom, left, tag_index, qr_index, dot_ratio = key
     tag_mm = TAG_SCALE_MM[int(tag_index)]
     qr_mm = QR_SCALE_MM[int(qr_index)]
     cell, dpi = int(cell), int(dpi)
@@ -55,16 +58,17 @@ def _page_geometry_cached(key: tuple[float | int, ...]) -> PageGeometry:
     if usable_w < cell * 4 or usable_h < cell * 4:
         raise ValueError("page margins leave no usable grid")
     cols, rows = usable_w // cell, usable_h // cell
-    centre = centre_block(
-        page_w, page_h, origin_x, origin_y, cols, rows, cell, dpi, int(symbols), qr_mm,
-    )
+    headers = header_slots(cols, rows, cell, dpi, int(symbols), qr_mm)
     tag = tag_pixel_size(dpi, tag_mm)
     quiet = tag_quiet_px(dpi, tag_mm)
     tag_rows, tag_cols = choose_tag_grid(usable_w, usable_h, tag, quiet, dpi, float(pitch_mm))
-    slots = place_tags(usable_w, usable_h, tag, quiet, tag_rows, tag_cols, cell)
-    tags = clear_tags(slots, centre.block, quiet, usable_w, usable_h, _shift_limit(slots, tag_cols))
+    placed = place_tags(usable_w, usable_h, tag, quiet, tag_rows, tag_cols, cell)
+    air = mm_to_px(CLEARANCE_MM, dpi)
+    headers = seat_slots(headers, placed, quiet, usable_w, usable_h, cell, air)
+    blocks = tuple(slot.block for slot in headers)
+    tags = clear_tags(placed, blocks, quiet, usable_w, usable_h, _shift_limit(placed, tag_cols), air)
     if len(tags) < 4:
-        raise ValueError("the centred QR header leaves fewer than four alignment tags")
+        raise ValueError("the header blocks leave fewer than four alignment tags")
     return PageGeometry(
         page_w=page_w,
         page_h=page_h,
@@ -75,14 +79,12 @@ def _page_geometry_cached(key: tuple[float | int, ...]) -> PageGeometry:
         cell=cell,
         cols=cols,
         rows=rows,
-        qr=centre.qr,
-        calibration=centre.calibration,
+        slots=headers,
         cal_rows=CALIBRATION_REPEATS,
-        centre=centre.block,
         tags=tags,
         tag_rows=tag_rows,
         tag_cols=tag_cols,
-        forbidden=_forbidden(usable_w, usable_h, centre.block, tags, quiet),
+        forbidden=_forbidden(usable_w, usable_h, blocks, tags, quiet, dot_radius_px(cell, float(dot_ratio))),
     )
 
 
@@ -96,14 +98,19 @@ def _shift_limit(slots: tuple[TagMark, ...], tag_cols: int) -> int:
 def _forbidden(
     usable_w: int,
     usable_h: int,
-    centre: Region,
+    blocks: tuple[Region, ...],
     tags: tuple[TagMark, ...],
     quiet: int,
+    pad: int,
 ) -> tuple[tuple[int, int, int, int], ...]:
-    rects = [(centre.x, centre.y, centre.width, centre.height)]
-    for tag in tags:
-        rects.append(_clamp(tag_box(tag, quiet), usable_w, usable_h))
-    return tuple(rects)
+    rects = [_inflate((block.x, block.y, block.width, block.height), pad) for block in blocks]
+    rects.extend(_inflate(tag_box(tag, quiet), pad) for tag in tags)
+    return tuple(_clamp(rect, usable_w, usable_h) for rect in rects)
+
+
+def _inflate(box: tuple[int, int, int, int], pad: int) -> tuple[int, int, int, int]:
+    x, y, width, height = box
+    return (x - pad, y - pad, width + 2 * pad, height + 2 * pad)
 
 
 def _clamp(box: tuple[int, int, int, int], limit_w: int, limit_h: int) -> tuple[int, int, int, int]:

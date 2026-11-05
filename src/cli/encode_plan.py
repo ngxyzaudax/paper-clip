@@ -39,7 +39,8 @@ def show_encoding_plan(
         ("QR module", f"{config.qr_module_mm:g} mm"),
         ("Dot ratio", f"{config.dot_ratio:g}"),
         ("Page image", f"{pw} x {ph} px"),
-        ("RS redundancy", f"{config.rs_redundancy:.0%}"),
+        ("Parity bytes", f"{config.ecc_sym} parity bytes"),
+        ("Parity pages", str(config.redundancy_pages)),
     ], title="Encoding Configuration")
     console.print("\n[bold]Symbol palette:[/bold]")
     _print_swatch(0, (255, 255, 255), "blank paper, no dot")

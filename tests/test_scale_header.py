@@ -9,7 +9,7 @@ from serialization.decode.header_config import config_from_header
 from serialization.encode.qr_header import decode_header_bytes, encode_header_bytes
 
 
-def test_legacy_flags_keep_the_qr_module() -> None:
+def test_qr_scale_starts_at_the_default_module() -> None:
     assert qr_mm_from_flags(0) == 0.36
     assert qr_mm_from_flags(FLAG_USER_PASSPHRASE) == 0.36
     marked = flags_with_qr_mm(FLAG_USER_PASSPHRASE, 0.25)
@@ -18,7 +18,7 @@ def test_legacy_flags_keep_the_qr_module() -> None:
     assert flags_with_qr_mm(0, 0.36) == 0
 
 
-def test_legacy_cell_field_keeps_the_dot_ratio() -> None:
+def test_dot_ratio_scale_starts_at_the_default() -> None:
     assert unpack_cell_field(32) == (32, 0.62)
     packed = pack_cell_field(22, 0.50)
     assert unpack_cell_field(packed) == (22, 0.50)

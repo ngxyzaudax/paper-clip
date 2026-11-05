@@ -15,7 +15,7 @@ def test_scan_record_finds_side_and_rotation_and_caches(tmp_path) -> None:
     scan = tmp_path / "scan-01.png"
     Image.fromarray(np.ascontiguousarray(image)).save(scan, compress_level=1)
     record = scan_record(scan)
-    assert (record.side, record.rotation, len(record.reads)) == ("back", 180, 25)
+    assert (record.side, record.rotation, len(record.reads)) == ("back", 180, 40)
     assert all(read.decoded for read in record.reads if read.kind == "qr")
     assert all(
         read.accuracy >= 0.99 and not read.slipped and read.tags_found == read.tags_expected

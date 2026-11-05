@@ -9,7 +9,7 @@ from common.page_layout import data_capacity_bytes
 from common.tag_scale import flags_with_tag_mm, tag_mm_from_flags
 
 
-def test_legacy_tag_pixels_stay_on_the_eight_millimetre_snap() -> None:
+def test_tag_pixels_scale_from_the_eight_millimetre_grid() -> None:
     raw = max(40, mm_to_px(8.0, 720))
     base = max(40, (raw // 10) * 10)
     assert tag_pixel_size(720) == base
@@ -19,7 +19,7 @@ def test_legacy_tag_pixels_stay_on_the_eight_millimetre_snap() -> None:
     assert tag_quiet_px(720, 4.0) < tag_quiet_px(720)
 
 
-def test_legacy_flags_keep_eight_millimetre_tags() -> None:
+def test_tag_scale_starts_at_eight_millimetres() -> None:
     assert tag_mm_from_flags(0) == 8.0
     assert tag_mm_from_flags(FLAG_USER_PASSPHRASE) == 8.0
     marked = flags_with_tag_mm(FLAG_USER_PASSPHRASE, 4.0)

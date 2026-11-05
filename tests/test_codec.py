@@ -3,8 +3,8 @@ import os
 import pytest
 from reedsolo import ReedSolomonError
 
-from common.codec import calculate_ecc_symbols, deinterleave_blocks, interleave_blocks, rs_decode_block, rs_encode_block
-from common.config import BLOCK_SIZE, resolve_config
+from common.codec import deinterleave_blocks, interleave_blocks, rs_decode_block, rs_encode_block
+from common.config import resolve_config
 from common.fountain import encode_parity_pages, reconstruct_missing
 from serialization.decode.errors import DecodeError
 from serialization.decode.recover import recover_stream
@@ -41,7 +41,7 @@ def test_payload_frame_survives_rs_and_checks_hash() -> None:
     config = resolve_config(paper_size="A6", print_dpi=360, cell_size_px=18, margin_mm=10)
     raw = os.urandom(120)
     prepared = prepare_payload(raw, config, "round.bin", None)
-    recovered, name = recover_stream(prepared.payload, _header(prepared, config), [], None)
+    recovered, name, _repair = recover_stream(prepared.payload, _header(prepared, config), [], None)
     assert name == "round.bin"
     assert recovered == raw
 
@@ -53,7 +53,7 @@ def test_user_passphrase_is_required() -> None:
     header = _header(prepared, config, prepared.flags)
     with pytest.raises(DecodeError):
         recover_stream(prepared.payload, header, [], None)
-    recovered, name = recover_stream(prepared.payload, header, [], "correct horse")
+    recovered, name, _repair = recover_stream(prepared.payload, header, [], "correct horse")
     assert recovered == raw
     assert name == "secret.bin"
 
@@ -69,7 +69,7 @@ def test_page_parity_rebuilds_a_missing_page() -> None:
 
 
 def test_too_many_errors_raise() -> None:
-    ecc = calculate_ecc_symbols(BLOCK_SIZE, 0.2)
+    ecc = 40
     block = os.urandom(40)
     encoded = bytearray(rs_encode_block(block, ecc))
     for index in range(0, ecc + 4):

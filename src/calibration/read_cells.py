@@ -16,8 +16,9 @@ def classified_symbols(
     detected: dict[int, np.ndarray],
     qr_points: np.ndarray | None,
     model: object | None,
+    extra_points: tuple[np.ndarray, ...] = (),
 ) -> list[int]:
-    warped = warp_page(image, geometry, detected, qr_points)
+    warped = warp_page(image, geometry, detected, qr_points, extra_points)
     colour = restore_page(warped)
     dx, dy, refs = calibration_offset_and_refs(colour, geometry, config)
     symbols, _confidence = classify_cells(

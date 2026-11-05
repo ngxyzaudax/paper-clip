@@ -8,7 +8,7 @@ def qr_module_options() -> list[tuple[str, float]]:
 
 
 def dot_ratio_options() -> list[tuple[str, float]]:
-    return [(f"{ratio:g}", ratio) for ratio in DOT_RATIO_SCALE]
+    return [(f"{round(ratio * 100)}%", ratio) for ratio in DOT_RATIO_SCALE]
 
 
 def tag_size_options() -> list[tuple[str, float]]:

@@ -8,6 +8,8 @@ from common.device_discover import list_ipp_printers
 from common.device_error import DeviceError
 from common.ipp_media import MEDIA_SIZES
 from common.ipp_print import print_pages
+from common.types import PrinterInfo
+from workflows.device_pick import choose_printer
 
 
 def print_command(
@@ -61,13 +63,8 @@ def _success(pages: list[Path], job_ids: list[int], uri: str, duplex: bool) -> s
 
 
 def _saved_or_only_printer() -> str:
-    saved = str(get_printer_settings().get("uri", ""))
-    if saved:
-        return saved
-    found = list_ipp_printers()
-    if len(found) == 1:
-        return found[0].uri
-    if not found:
-        raise DeviceError("no IPP printer found; pass --uri or set printer.uri")
-    listed = ", ".join(item.uri for item in found)
-    raise DeviceError(f"multiple IPP printers; pass --uri ({listed})")
+    return choose_printer(get_printer_settings(), _listed_printers)
+
+
+def _listed_printers() -> list[PrinterInfo]:
+    return list_ipp_printers()

@@ -3,6 +3,7 @@ import numpy as np
 from common.drawing import dot_radius_px
 from common.format_spec import DOT_DIAMETER_RATIO
 from common.geometry import PageGeometry
+from common.types import Region
 
 
 def sample_radius(cell: int, ratio: float = DOT_DIAMETER_RATIO) -> int:
@@ -34,8 +35,8 @@ def cell_centers(
     return xs, ys
 
 
-def calibration_points(
-    geometry: PageGeometry, num_symbols: int, dx: int, dy: int,
+def strip_points(
+    geometry: PageGeometry, region: Region, num_symbols: int, dx: int, dy: int,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     count = geometry.cal_rows * num_symbols
     xs = np.empty(count, np.float32)
@@ -45,8 +46,8 @@ def calibration_points(
     index = 0
     for row in range(geometry.cal_rows):
         for symbol in range(num_symbols):
-            xs[index] = geometry.origin_x + geometry.calibration.x + symbol * geometry.cell + half + dx
-            ys[index] = geometry.origin_y + geometry.calibration.y + row * geometry.cell + half + dy
+            xs[index] = geometry.origin_x + region.x + symbol * geometry.cell + half + dx
+            ys[index] = geometry.origin_y + region.y + row * geometry.cell + half + dy
             symbols[index] = symbol
             index += 1
     return symbols, xs, ys

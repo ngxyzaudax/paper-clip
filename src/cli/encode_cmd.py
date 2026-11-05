@@ -6,11 +6,13 @@ from rich.console import Console
 from cli.display import make_page_callback, make_page_progress, print_error, print_success
 from cli.encode_plan import show_encoding_plan
 from cli.encoding_cli import cli_encoding_config
-from common.config import ALGO_FIELDS
-from common.data_store import create_print_job, digital_dir
-from common.page_layout import data_capacity_bytes, pages_needed
-from common.paper_sizes import detect_paper_size
+from common.config import PaperClipConfig
+from common.data_store import digital_dir
+from serialization.encode.encoder import prepare_payload
+from serialization.encode.fill_sheets import FILL_PRIORITIES, SheetPlan, plan_config
+from serialization.encode.frame_payload import PreparedPayload
 from serialization.encode.pipeline import encode
+from workflows.encode_job import create_encode_job
 
 console = Console()
 
@@ -27,11 +29,13 @@ def encode_command(
     ),
     cell_size_px: int | None = typer.Option(
         None,
-        help="Cell size in pixels. Saved calibration profile, otherwise 22. Must be at least 0.49 mm.",
+        help="Cell size in pixels. Saved calibration profile, otherwise 22. Must be at least 0.35 mm.",
     ),
     paper_size: str | None = typer.Option(None, help="Paper size (A3, A4, A5, Letter, Legal, etc.)"),
     print_dpi: int | None = typer.Option(None, help="Logical page DPI for layout and print hints"),
-    rs_redundancy: float | None = typer.Option(None, help="Reed–Solomon redundancy (0.05–0.50). Default 0.25."),
+    ecc_sym: int | None = typer.Option(
+        None, "--ecc-sym", help="Parity bytes per Reed–Solomon block (2–254). Default 50.",
+    ),
     redundancy_pages: int | None = typer.Option(None, help="Extra parity pages (fountain)"),
     margin_mm: float | None = typer.Option(None, help="Uniform page margin in mm (all sides)"),
     margin_top_mm: float | None = typer.Option(None, help="Top page margin in mm"),
@@ -48,6 +52,16 @@ def encode_command(
     dot_ratio: float | None = typer.Option(
         None, "--dot-ratio", help="Dot diameter as a fraction of the cell. Default 0.62",
     ),
+    sides: int = typer.Option(1, "--sides", min=1, max=2, help="Sides printed per sheet: 1 or 2 (duplex)"),
+    fill_sheets: bool = typer.Option(
+        False,
+        "--fill-sheets/--no-fill-sheets",
+        help="Use every side of the sheets the file needs: extra parity pages, more parity bytes, larger cells",
+    ),
+    sheets: int = typer.Option(0, "--sheets", min=0, help="With --fill-sheets, fill at least this many sheets"),
+    fill_priority: str = typer.Option(
+        "protection", "--fill-priority", help="With --fill-sheets, spend spare room on: protection, balanced, or dots",
+    ),
     password: str | None = typer.Option(
         None,
         help="Passphrase for payload encryption (built-in default key when omitted)",
@@ -57,58 +71,45 @@ def encode_command(
     if not input_file.exists():
         print_error(f"File not found: {input_file}")
         raise typer.Exit(1)
-
-    config = cli_encoding_config(
+    if fill_priority not in FILL_PRIORITIES:
+        print_error(f"--fill-priority must be one of: {', '.join(FILL_PRIORITIES)}")
+        raise typer.Exit(1)
+    requested = cli_encoding_config(
         num_symbols, cell_size_px, paper_size,
-        print_dpi, rs_redundancy, redundancy_pages, margin_mm,
+        print_dpi, ecc_sym, redundancy_pages, margin_mm,
         margin_top_mm, margin_right_mm, margin_bottom_mm, margin_left_mm,
         tag_pitch_mm, tag_size_mm, qr_module_mm, dot_ratio,
     )
+    raw = input_file.read_bytes()
+    plan = SheetPlan(sides, fill_sheets, sheets, fill_priority)
+    config = plan_config(raw, requested, input_file.name, plan)
+    prepared = prepare_payload(raw, config, filename=input_file.name, passphrase=password)
+    _render(input_file, len(raw), config, prepared, password, sides)
 
-    from serialization.encode.encoder import prepare_payload
 
-    raw_data = input_file.read_bytes()
-    file_size = len(raw_data)
-    prepared = prepare_payload(
-        raw_data, config, filename=input_file.name, passphrase=password,
-    )
-    payload = prepared.payload
-    data_pages = pages_needed(len(payload), config)
-    total_pages = data_pages + config.redundancy_pages
-    config_dict = {k: getattr(config, k) for k in ALGO_FIELDS}
-    for k in (
-        "margin_top_mm",
-        "margin_right_mm",
-        "margin_bottom_mm",
-        "margin_left_mm",
-        "page_width_mm",
-        "page_height_mm",
-    ):
-        config_dict[k] = getattr(config, k)
-    job_dir = create_print_job(
-        input_file.name, "inline", config_dict, total_pages,
-        paper_size=detect_paper_size(config.page_width_mm, config.page_height_mm),
-        data_pages=data_pages,
-        payload_bytes=len(payload),
-        data_capacity_bytes_per_page=data_capacity_bytes(config),
-    )
+def _render(
+    input_file: Path,
+    file_size: int,
+    config: PaperClipConfig,
+    prepared: PreparedPayload,
+    password: str | None,
+    sides: int,
+) -> None:
+    job_dir = create_encode_job(config, input_file.name, prepared, sides)
     output_base = digital_dir(job_dir) / "page"
     console.print(f"[cyan]Job created: {job_dir}[/cyan]\n")
-
-    show_encoding_plan(input_file, output_base.parent, config, file_size, len(payload))
+    show_encoding_plan(input_file, output_base.parent, config, file_size, len(prepared.payload))
     if password:
         console.print("[bold yellow]User passphrase in use[/bold yellow]")
     console.print()
-
     progress, task = make_page_progress("Rendering pages")
     with progress:
-        png_paths = encode(
+        paths = encode(
             input_file, output_base, config,
             on_page_complete=make_page_callback(progress, task),
             passphrase=password,
             prepared=prepared,
         )
-
-    for p in png_paths:
-        print_success(f"Saved {p}")
+    for path in paths:
+        print_success(f"Saved {path}")
     console.print(f"\n[bold]Job directory: {job_dir}[/bold]")

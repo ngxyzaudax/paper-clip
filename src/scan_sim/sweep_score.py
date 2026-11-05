@@ -70,7 +70,7 @@ def _mismatch(observed: tuple[int, ...], expected: list[int]) -> int:
 
 def _recovered(pages: list[PageObservation], payload: bytes) -> bool:
     try:
-        raw, _name = assemble_pages(pages, None)
+        assembly = assemble_pages(pages, None)
     except DecodeError:
         return False
-    return raw == payload
+    return assembly.raw == payload

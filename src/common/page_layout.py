@@ -32,7 +32,7 @@ def data_grid_region(config: PaperClipConfig) -> Region:
 
 
 def qr_region(config: PaperClipConfig) -> Region:
-    return page_geometry(config).qr
+    return page_geometry(config).slots[0].qr
 
 
 def alignment_tag_placements(config: PaperClipConfig) -> list[tuple[int, int, int, int]]:

@@ -1,0 +1,28 @@
+:root {
+  --paper: #f4f1ea;
+  --surface: #fffcf7;
+  --ink: #1c1915;
+  --muted: #6b645b;
+  --line: #e4ddd2;
+  --accent: #1f4d3a;
+  --accent-ink: #f4f1ea;
+  --healthy: #2f6b4f;
+  --worn: #a37b1f;
+  --risk: #c45c12;
+  --critical: #9d2c2c;
+  --lost: #5c2430;
+  --sans: "IBM Plex Sans", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --paper: #161411;
+  --surface: #211e1a;
+  --ink: #f3efe6;
+  --muted: #b3aa9e;
+  --line: #3a342c;
+  --accent: #8fbfa4;
+  --accent-ink: #161411;
+  color-scheme: dark;
+}

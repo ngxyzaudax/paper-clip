@@ -27,9 +27,10 @@ def layout_rows(config: PaperClipConfig) -> list[tuple[str, str]]:
         ("margins", f"left {mm(g.origin_x)}, top {mm(g.origin_y)}, right {mm(right)}, bottom {mm(bottom)} mm"),
         ("data area", f"{_box_mm(mm, _page_box(g, (0, 0, g.usable_w, g.usable_h)))}"),
         ("cells", f"{g.cols} x {g.rows} grid of {mm(g.cell)} mm, {data_capacity_symbols(config)} data cells"),
-        ("qr", _box_mm(mm, _page_box(g, g.qr))),
-        ("strip", _box_mm(mm, _page_box(g, g.calibration))),
-        ("centre block", _box_mm(mm, _page_box(g, g.centre))),
+        *[
+            (f"header {index}", _box_mm(mm, _page_box(g, slot.block)))
+            for index, slot in enumerate(g.slots, start=1)
+        ],
         ("tags", f"{len(g.tags)} of {g.tag_rows} x {g.tag_cols}, {mm(g.tags[0].size)} mm"),
     ]
 
@@ -43,10 +44,11 @@ def annotate_page(page: np.ndarray, config: PaperClipConfig, scale: int = 2) -> 
     _shade_margins(draw, usable, g.page_w, g.page_h)
     line = max(4, g.cell // 4)
     draw.rectangle(_corners(usable), outline=DATA, width=line)
-    draw.rectangle(_corners(_page_box(g, g.centre)), outline=BLOCK, width=line)
-    draw.rectangle(_corners(_page_box(g, g.qr)), fill=QR, outline=QR[:3] + (255,), width=line)
-    draw.rectangle(_corners(_page_box(g, g.calibration)), outline=STRIP, width=line)
-    quiet = tag_quiet_px(config.print_dpi)
+    for slot in g.slots:
+        draw.rectangle(_corners(_page_box(g, slot.block)), outline=BLOCK, width=line)
+        draw.rectangle(_corners(_page_box(g, slot.qr)), fill=QR, outline=QR[:3] + (255,), width=line)
+        draw.rectangle(_corners(_page_box(g, slot.calibration)), outline=STRIP, width=line)
+    quiet = tag_quiet_px(config.print_dpi, config.tag_size_mm)
     for tag in g.tags:
         draw.rectangle(_corners(_page_box(g, tag_box(tag, quiet))), fill=TAG, outline=TAG[:3] + (255,), width=line)
     _labels(draw, g, config, usable)
@@ -57,10 +59,11 @@ def annotate_page(page: np.ndarray, config: PaperClipConfig, scale: int = 2) -> 
 def _labels(draw: ImageDraw.ImageDraw, g: PageGeometry, config: PaperClipConfig, usable: Box) -> None:
     mm = _mm(config)
     font = ImageFont.load_default(size=max(24, g.page_w // 50))
-    qr, strip, block = (_page_box(g, region) for region in (g.qr, g.calibration, g.centre))
+    slot = g.slots[0]
+    qr, strip, block = (_page_box(g, region) for region in (slot.qr, slot.calibration, slot.block))
     _tag(draw, font, (qr[0], qr[1] - 2.2 * font.size), f"QR header {mm(qr[2])} mm", QR[:3])
     _tag(draw, font, (block[0] + block[2] + font.size, strip[1]), "calibration strip", STRIP[:3])
-    _tag(draw, font, (block[0], block[1] + block[3] + 0.6 * font.size), "centre keep-out", BLOCK[:3])
+    _tag(draw, font, (block[0], block[1] + block[3] + 0.6 * font.size), "header keep-out", BLOCK[:3])
     _tag(draw, font, (usable[0] + g.cell, usable[1] + usable[3] - 2.6 * font.size), "data area", DATA[:3])
     _tag(draw, font, (usable[0], 0.1 * font.size), f"margin {mm(g.origin_y)} mm", MARGIN[:3])
     first = g.tags[0]

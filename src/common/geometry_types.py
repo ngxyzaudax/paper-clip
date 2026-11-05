@@ -12,6 +12,12 @@ class TagMark(NamedTuple):
     size: int
 
 
+class HeaderSlot(NamedTuple):
+    qr: Region
+    calibration: Region
+    block: Region
+
+
 class PageGeometry(NamedTuple):
     page_w: int
     page_h: int
@@ -22,10 +28,8 @@ class PageGeometry(NamedTuple):
     cell: int
     cols: int
     rows: int
-    qr: Region
-    calibration: Region
+    slots: tuple[HeaderSlot, ...]
     cal_rows: int
-    centre: Region
     tags: tuple[TagMark, ...]
     tag_rows: int
     tag_cols: int

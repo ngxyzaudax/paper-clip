@@ -13,6 +13,7 @@ from serialization.encode.frame_payload import PreparedPayload
 from serialization.encode.renderer import render_page
 
 OnPageComplete = Callable[[int, int, Path | None], None]
+OnPageImage = Callable[[int, int, Image.Image], None]
 
 
 def render_parity_pages(
@@ -22,6 +23,7 @@ def render_parity_pages(
     total_pages: int,
     prepared: PreparedPayload,
     on_page_complete: OnPageComplete | None,
+    duplex: bool = False,
 ) -> list[Image.Image]:
     cols, rows = grid_dimensions(config)
     valid_order = valid_cells_ordered(config)
@@ -34,7 +36,7 @@ def render_parity_pages(
     for offset, parity in enumerate(encode_parity_pages(chunks, config.redundancy_pages)):
         page_idx = data_pages + offset
         grid = _sparse_symbol_grid(bytes_to_symbols(parity, config.num_symbols), cols, rows, valid_order)
-        image = render_page(grid, page_idx, total_pages, data_pages, prepared, config)
+        image = render_page(grid, page_idx, total_pages, data_pages, prepared, config, duplex)
         images.append(image)
         if on_page_complete:
             on_page_complete(page_idx, total_pages, None)

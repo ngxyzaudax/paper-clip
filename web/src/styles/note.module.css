@@ -1,0 +1,68 @@
+.note {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  align-items: center;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.title {
+  font-weight: 500;
+}
+
+.detail {
+  grid-column: 2;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.retry {
+  grid-column: 2;
+  justify-self: start;
+}
+
+.empty { border-style: dashed; }
+.busy { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.error { border-color: var(--critical); }
+
+.mark {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--muted);
+}
+
+.busy .mark {
+  background: var(--accent);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.error .mark { background: var(--critical); }
+.empty .mark { background: var(--line); }
+
+@keyframes pulse {
+  50% { opacity: 0.35; }
+}
+
+.band {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  padding: 2px 8px 2px 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--muted);
+}

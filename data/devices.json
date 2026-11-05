@@ -5,12 +5,12 @@
     "dpi": 0,
     "paper_size": "A4",
     "profile": {
-      "cell_size_px": "14",
+      "cell_size_px": "13",
       "num_symbols": "11",
       "tag_size_mm": "6",
       "tag_pitch_mm": "24",
       "print_dpi": "720",
-      "bits_per_cm2": "1230.25",
+      "bits_per_cm2": "1429.53",
       "qr_module_mm": "0.22",
       "dot_ratio": "0.62"
     }

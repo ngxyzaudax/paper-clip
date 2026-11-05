@@ -3,9 +3,9 @@ from pathlib import Path
 import typer
 
 from cli.display import print_error, print_success
+from cli.health_cmd import checked_or_exit
+from cli.health_print import print_check
 from common.decode_output import decode_destination, write_recovered
-from serialization.decode.errors import DecodeError
-from serialization.decode.pipeline import decode
 
 
 def decode_command(
@@ -15,15 +15,14 @@ def decode_command(
     model: Path | None = typer.Option(None, "--model", help="Saved Keras cell decoder"),
     no_model: bool = typer.Option(False, "--no-model", help="Classify cells by calibrated nearest colour only"),
     force: bool = typer.Option(False, "--force", help="Overwrite the output file when it already exists"),
+    no_track: bool = typer.Option(False, "--no-track", help="Do not add this reading to the paper health history"),
 ) -> None:
-    """Read scanned pages back into the original file. An existing file is kept unless --force is given."""
-    if not source.exists():
-        print_error(f"Scan source not found: {source}")
+    """Read scanned pages back into the original file and rate the paper's health. Existing files are kept unless --force."""
+    check = checked_or_exit(source, password, model, no_model, not no_track)
+    print_check(check)
+    if check.decoded is None:
+        print_error("The file could not be recovered from these scans. Try a cleaner rescan or another copy.")
         raise typer.Exit(1)
-    try:
-        raw, filename = decode(source, passphrase=password, model_path=model, use_model=False if no_model else None)
-    except DecodeError as exc:
-        print_error(str(exc))
-        raise typer.Exit(1) from exc
-    destination = write_recovered(decode_destination(output, filename, force), raw)
-    print_success(f"Recovered {filename} ({len(raw):,} bytes) -> {destination}")
+    decoded = check.decoded
+    destination = write_recovered(decode_destination(output, decoded.filename, force), decoded.raw)
+    print_success(f"Recovered {decoded.filename} ({len(decoded.raw):,} bytes) -> {destination}")

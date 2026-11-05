@@ -1,9 +1,11 @@
 from dataclasses import dataclass, fields
 
 from common.format_spec import (
-    BLOCK_SIZE,
+    DEFAULT_ECC_SYM,
     DEFAULT_MARGIN_MM,
     DOT_DIAMETER_RATIO,
+    ECC_MAX,
+    ECC_MIN,
     MIN_CELL_MM,
     MIN_MARGIN_MM,
     QR_MODULE_MM,
@@ -24,7 +26,7 @@ class PaperClipConfig:
     num_symbols: int = 5
     cell_size_px: int = CELL_HOLD_PX
     print_dpi: int = 720
-    rs_redundancy: float = 0.25
+    ecc_sym: int = DEFAULT_ECC_SYM
     tag_pitch_mm: float = TAG_TARGET_PITCH_MM
     tag_size_mm: float = TAG_HOLD_MM
     redundancy_pages: int = 0
@@ -45,8 +47,8 @@ def validate_config(config: PaperClipConfig) -> PaperClipConfig:
     _validate_cell(config)
     if config.print_dpi < 300:
         raise ValueError("print_dpi must be at least 300")
-    if config.rs_redundancy < 0.05 or config.rs_redundancy > 0.50:
-        raise ValueError("rs_redundancy must be between 0.05 and 0.50")
+    if not ECC_MIN <= config.ecc_sym <= ECC_MAX:
+        raise ValueError(f"ecc_sym must be between {ECC_MIN} and {ECC_MAX}")
     tag_scale_index(config.tag_size_mm)
     qr_scale_index(config.qr_module_mm)
     dot_ratio_index(config.dot_ratio)
@@ -85,7 +87,7 @@ ALGO_FIELDS = (
     "num_symbols",
     "cell_size_px",
     "print_dpi",
-    "rs_redundancy",
+    "ecc_sym",
     "tag_pitch_mm",
     "tag_size_mm",
     "redundancy_pages",

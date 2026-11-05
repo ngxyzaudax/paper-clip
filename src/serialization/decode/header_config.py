@@ -1,4 +1,4 @@
-from common.config import BLOCK_SIZE, PaperClipConfig, validate_config
+from common.config import PaperClipConfig, validate_config
 from common.qr_scale import qr_mm_from_flags
 from common.tag_scale import tag_mm_from_flags
 from serialization.encode.qr_header import DecodedQrHeader
@@ -9,7 +9,7 @@ def config_from_header(header: DecodedQrHeader) -> PaperClipConfig:
         num_symbols=header.num_symbols,
         cell_size_px=header.cell_size_px,
         print_dpi=header.print_dpi,
-        rs_redundancy=header.ecc_sym / BLOCK_SIZE,
+        ecc_sym=header.ecc_sym,
         tag_pitch_mm=float(header.tag_pitch_mm),
         tag_size_mm=tag_mm_from_flags(header.flags),
         redundancy_pages=max(0, header.total_pages - header.data_pages),

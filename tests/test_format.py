@@ -3,8 +3,7 @@ from dataclasses import replace
 
 import pytest
 
-from common.codec import calculate_ecc_symbols
-from common.config import BLOCK_SIZE, default_config, resolve_config, validate_config
+from common.config import default_config, resolve_config, validate_config
 from common.drawing import dot_radius_px
 from common.format_spec import HEADER_BODY, HEADER_STRUCT
 from common.geometry import page_geometry
@@ -35,7 +34,7 @@ def test_header_roundtrip_carries_length_dpi_and_hash() -> None:
     assert header.payload_length == len(prepared.payload)
     assert header.original_length == len(raw)
     assert header.original_sha256 == prepared.original_sha256
-    assert header.ecc_sym == calculate_ecc_symbols(BLOCK_SIZE, config.rs_redundancy)
+    assert header.ecc_sym == config.ecc_sym == 50
     assert len(base64.b64encode(blob)) <= 122
 
 
@@ -44,7 +43,8 @@ def test_qr_image_is_native_module_size() -> None:
     geometry = page_geometry(config)
     blob = encode_header_bytes(config, 0, 1, 1, 240, 4, b"\x00" * 32, 0)
     image = qr_image(blob, config.print_dpi)
-    assert image.size == (geometry.qr.width, geometry.qr.height)
+    assert image.size == (geometry.slots[0].qr.width, geometry.slots[0].qr.height)
+    assert len({(slot.qr.width, slot.qr.height) for slot in geometry.slots}) == 1
 
 
 def test_default_preset_is_the_et8500_hold_point() -> None:
@@ -101,3 +101,22 @@ def test_a6_sweep_page_has_more_tags_than_3x3() -> None:
 def test_cell_below_minimum_millimetre_is_rejected() -> None:
     with pytest.raises(ValueError):
         resolve_config(cell_size_px=10, print_dpi=1200)
+
+
+def test_parity_count_roundtrips_above_one_hundred() -> None:
+    from serialization.decode.header_config import config_from_header
+
+    config = resolve_config(
+        paper_size="A6", print_dpi=360, cell_size_px=18, margin_mm=10, ecc_sym=150,
+    )
+    blob = encode_header_bytes(config, 0, 1, 1, 10, 4, b"\x00" * 32, 0)
+    header = decode_header_bytes(blob)
+    assert header.ecc_sym == 150
+    assert config_from_header(header).ecc_sym == 150
+
+
+def test_parity_count_outside_the_codeword_is_rejected() -> None:
+    with pytest.raises(ValueError):
+        resolve_config(ecc_sym=1)
+    with pytest.raises(ValueError):
+        resolve_config(ecc_sym=255)

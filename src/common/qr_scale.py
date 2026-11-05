@@ -1,9 +1,4 @@
-from common.format_spec import (
-    FLAG_QR_SCALE_MASK,
-    FLAG_QR_SCALE_SHIFT,
-    QR_MODULE_MM,
-    QR_SCALE_MM,
-)
+from common.format_spec import FLAG_QR_SCALE_MASK, FLAG_QR_SCALE_SHIFT, QR_SCALE_MM
 
 
 def qr_scale_index(module_mm: float) -> int:
@@ -15,8 +10,6 @@ def qr_scale_index(module_mm: float) -> int:
 
 def qr_mm_from_flags(flags: int) -> float:
     index = (int(flags) >> FLAG_QR_SCALE_SHIFT) & 0x7
-    if index >= len(QR_SCALE_MM):
-        return QR_MODULE_MM
     return QR_SCALE_MM[index]
 
 

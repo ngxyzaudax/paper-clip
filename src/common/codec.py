@@ -1,13 +1,8 @@
-import math
 from functools import lru_cache
 
 from reedsolo import RSCodec
 
 GF_MAX_CODEWORD = 255
-
-
-def calculate_ecc_symbols(block_size: int, redundancy: float) -> int:
-    return max(2, math.ceil(block_size * redundancy))
 
 
 def effective_block_size(ecc_symbols: int) -> int:
@@ -55,22 +50,28 @@ def deinterleave_blocks(data: bytes, num_blocks: int, codeword_len: int) -> list
 def rs_decode_block(
     data: bytes, ecc_symbols: int, erase_pos: list[int] | None = None,
 ) -> bytes:
+    return rs_repair_block(data, ecc_symbols, erase_pos)[0]
+
+
+def rs_repair_block(
+    data: bytes, ecc_symbols: int, erase_pos: list[int] | None = None,
+) -> tuple[bytes, tuple[int, ...], bytes]:
+    """Decoded message, positions found as errors beyond the given erasures, and the corrected codeword."""
     codec = _get_codec(ecc_symbols)
-    if erase_pos:
-        decoded = codec.decode(bytearray(data), erase_pos=list(erase_pos))[0]
-    else:
-        decoded = codec.decode(bytearray(data))[0]
-    return bytes(decoded)
+    erased = list(erase_pos or ())
+    decoded, codeword, errata = codec.decode(bytearray(data), erase_pos=erased or None)
+    known = set(erased)
+    errors = tuple(sorted(int(pos) for pos in errata if int(pos) not in known))
+    return bytes(decoded), errors, bytes(codeword)
 
 
 def rs_encoded_stream_data_vs_parity(
     total_encoded_bytes: int,
-    block_size: int,
-    redundancy: float,
+    ecc_symbols: int,
 ) -> tuple[int, int]:
     if total_encoded_bytes <= 0:
         return 0, 0
-    ecc = calculate_ecc_symbols(block_size, redundancy)
+    ecc = ecc_symbols
     bs = effective_block_size(ecc)
     denom = bs + ecc
     if denom <= 0:

@@ -1,6 +1,6 @@
 from common.symbols import chunk_params, symbols_to_bytes
 
-_ERASURE_CONFIDENCE = 0.22
+ERASURE_CONFIDENCE = 0.22
 
 
 def bytes_and_erasures(
@@ -22,7 +22,7 @@ def bytes_and_erasures(
     data = symbols_to_bytes(padded, num_symbols, rounded)
     erasures = []
     for chunk in range(0, len(padded), m):
-        if any(conf[chunk + offset] < _ERASURE_CONFIDENCE for offset in range(m)):
+        if any(conf[chunk + offset] < ERASURE_CONFIDENCE for offset in range(m)):
             start = (chunk // m) * k
             erasures.extend(index for index in range(start, start + k) if index < expected_bytes)
     return data[:expected_bytes], erasures

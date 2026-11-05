@@ -1,9 +1,4 @@
-from common.format_spec import (
-    FLAG_TAG_SCALE_MASK,
-    FLAG_TAG_SCALE_SHIFT,
-    TAG_SCALE_MM,
-    TAG_SIZE_MM,
-)
+from common.format_spec import FLAG_TAG_SCALE_MASK, FLAG_TAG_SCALE_SHIFT, TAG_SCALE_MM
 
 
 def tag_scale_index(tag_mm: float) -> int:
@@ -15,8 +10,6 @@ def tag_scale_index(tag_mm: float) -> int:
 
 def tag_mm_from_flags(flags: int) -> float:
     index = (int(flags) >> FLAG_TAG_SCALE_SHIFT) & 0x7
-    if index >= len(TAG_SCALE_MM):
-        return TAG_SIZE_MM
     return TAG_SCALE_MM[index]
 
 

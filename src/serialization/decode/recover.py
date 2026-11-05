@@ -1,11 +1,20 @@
-from common.codec import deinterleave_blocks, effective_block_size, rs_decode_block
+from typing import NamedTuple
+
+from common.codec import effective_block_size
 from common.compression import decompress
 from common.crypto import compute_sha256
 from common.encryption import DEFAULT_ENCRYPTION_PASSPHRASE, decrypt
 from common.format_spec import FLAG_USER_PASSPHRASE
-from serialization.decode.errors import DecodeError
+from serialization.decode.errors import DecodeError, PassphraseError
+from serialization.decode.repair import StreamRepair, repair_blocks
 from serialization.encode.frame_payload import parse_frame
 from serialization.encode.qr_header import DecodedQrHeader
+
+
+class Recovered(NamedTuple):
+    raw: bytes
+    filename: str
+    repair: StreamRepair
 
 
 def recover_stream(
@@ -13,57 +22,52 @@ def recover_stream(
     header: DecodedQrHeader,
     erasures: list[int],
     passphrase: str | None,
-) -> tuple[bytes, str]:
+) -> Recovered:
     block_size = effective_block_size(header.ecc_sym)
     codeword = block_size + header.ecc_sym
     if codeword <= 0 or len(payload) % codeword != 0:
         raise DecodeError("payload length is not a whole number of Reed-Solomon codewords")
     num_blocks = len(payload) // codeword
-    framed = _decode_blocks(payload, num_blocks, codeword, header.ecc_sym, erasures)
+    framed, repair = repair_blocks(payload, num_blocks, codeword, header.ecc_sym, erasures)
+    blob, filename = _frame(framed)
+    raw = _open(blob, header, passphrase)
+    _check(raw, header)
+    return Recovered(raw, filename, repair)
+
+
+def _frame(framed: bytes) -> tuple[bytes, str]:
     try:
-        blob, filename = parse_frame(framed)
+        return parse_frame(framed)
     except ValueError as exc:
         raise DecodeError(str(exc)) from exc
+
+
+def _open(blob: bytes, header: DecodedQrHeader, passphrase: str | None) -> bytes:
+    key = _passphrase(header.flags, passphrase)
     try:
-        compressed = decrypt(blob, _passphrase(header.flags, passphrase))
-        raw = decompress(compressed)
-    except DecodeError:
-        raise
+        return decompress(decrypt(blob, key))
     except Exception as exc:
-        raise DecodeError("decryption or decompression failed") from exc
+        raise _open_error(header) from exc
+
+
+def _open_error(header: DecodedQrHeader) -> DecodeError:
+    if header.flags & FLAG_USER_PASSPHRASE:
+        return PassphraseError("decryption or decompression failed: the passphrase is wrong")
+    return DecodeError("decryption or decompression failed")
+
+
+def _check(raw: bytes, header: DecodedQrHeader) -> None:
     if len(raw) != header.original_length:
         raise DecodeError(
             f"original length mismatch: recovered {len(raw)} bytes, header says {header.original_length}"
         )
-    digest = compute_sha256(raw)
-    if digest != header.original_sha256:
+    if compute_sha256(raw) != header.original_sha256:
         raise DecodeError("SHA-256 of the recovered file does not match the QR header")
-    return raw, filename
-
-
-def _decode_blocks(
-    payload: bytes, num_blocks: int, codeword: int, ecc_symbols: int, erasures: list[int],
-) -> bytes:
-    blocks = deinterleave_blocks(payload, num_blocks, codeword)
-    decoded: list[bytes] = []
-    for index, block in enumerate(blocks):
-        erase = sorted({
-            pos // num_blocks
-            for pos in erasures
-            if pos % num_blocks == index and 0 <= pos // num_blocks < codeword
-        })
-        try:
-            decoded.append(rs_decode_block(block, ecc_symbols, erase or None))
-        except Exception as exc:
-            raise DecodeError(
-                f"Reed-Solomon decode failed with {len(erasures)} erasures: {exc}"
-            ) from exc
-    return b"".join(decoded)
 
 
 def _passphrase(flags: int, passphrase: str | None) -> str:
-    if passphrase:
-        return passphrase
-    if flags & FLAG_USER_PASSPHRASE:
-        raise DecodeError("this page was encrypted with a user passphrase")
-    return DEFAULT_ENCRYPTION_PASSPHRASE
+    if not flags & FLAG_USER_PASSPHRASE:
+        return DEFAULT_ENCRYPTION_PASSPHRASE
+    if not passphrase:
+        raise PassphraseError("this page was encrypted with a user passphrase")
+    return passphrase

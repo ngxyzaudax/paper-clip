@@ -2,9 +2,17 @@ from typing import NamedTuple
 
 from common.config import PaperClipConfig
 from common.device_config import get_printer_settings, load_device_config, save_device_config
-from common.format_spec import DOT_DIAMETER_RATIO, QR_MODULE_MM
 
-_KEYS = ("cell_size_px", "num_symbols", "tag_size_mm", "tag_pitch_mm", "print_dpi")
+_KEYS = (
+    "cell_size_px",
+    "num_symbols",
+    "tag_size_mm",
+    "tag_pitch_mm",
+    "print_dpi",
+    "bits_per_cm2",
+    "qr_module_mm",
+    "dot_ratio",
+)
 
 
 class DensityProfile(NamedTuple):
@@ -14,8 +22,8 @@ class DensityProfile(NamedTuple):
     tag_pitch_mm: float
     print_dpi: int
     bits_per_cm2: float
-    qr_module_mm: float = QR_MODULE_MM
-    dot_ratio: float = DOT_DIAMETER_RATIO
+    qr_module_mm: float
+    dot_ratio: float
 
 
 def load_density_profile() -> DensityProfile | None:
@@ -60,7 +68,7 @@ def _parse(raw: dict[str, str]) -> DensityProfile:
         tag_size_mm=float(raw["tag_size_mm"]),
         tag_pitch_mm=float(raw["tag_pitch_mm"]),
         print_dpi=int(raw["print_dpi"]),
-        bits_per_cm2=float(raw.get("bits_per_cm2") or 0),
-        qr_module_mm=float(raw.get("qr_module_mm") or QR_MODULE_MM),
-        dot_ratio=float(raw.get("dot_ratio") or DOT_DIAMETER_RATIO),
+        bits_per_cm2=float(raw["bits_per_cm2"]),
+        qr_module_mm=float(raw["qr_module_mm"]),
+        dot_ratio=float(raw["dot_ratio"]),
     )

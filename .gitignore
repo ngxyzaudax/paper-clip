@@ -22,6 +22,7 @@ src/ml/models/*.tflite
 data/print/
 data/scan/
 data/decoded/
+data/health/
 data/calibration/
 data/training/
 data/models/
@@ -46,6 +47,12 @@ events.out.tfevents.*
 
 # Logs
 data/logs/
+data/inbox/
+data/.thumbs/
+
+# Web UI build
+web/dist/
+web/node_modules/
 
 # Images / output artifacts
 *.png

@@ -2,7 +2,6 @@ from calibration.sheet_score import PatchRead
 from calibration.sheet_spec import (
     CELL_PITCHES,
     DENSE_CELLS,
-    DENSE_PITCH_MM,
     DENSE_QR_MM,
     DENSE_TAG_MM,
     DOT_RATIOS,
@@ -35,10 +34,6 @@ def passed_cell(reads: tuple[PatchRead, ...]) -> set[int]:
     return {cell for cell in _CELLS if any(pair_ok(reads, cell, ratio) for ratio in DOT_RATIOS)}
 
 
-def passed_dense_pitch(reads: tuple[PatchRead, ...]) -> set[float]:
-    return {mm for mm in DENSE_PITCH_MM if _all(reads, lambda read, mm=mm: read.kind == "pitch" and read.pitch_mm == mm, dots_ok)}
-
-
 def passed_ratio(reads: tuple[PatchRead, ...], cell: int) -> set[float]:
     return {ratio for ratio in DOT_RATIOS if pair_ok(reads, cell, ratio)}
 
@@ -46,13 +41,31 @@ def passed_ratio(reads: tuple[PatchRead, ...], cell: int) -> set[float]:
 def passed_symbols(reads: tuple[PatchRead, ...], cell: int) -> set[int]:
     found = {5} if cell in passed_cell(reads) else set()
     for count in (8, 11):
-        if _all(reads, lambda read: read.kind == "symbol" and read.cell_px == cell and read.symbols == count, dots_ok):
+        if _symbol_ok(reads, cell, count):
             found.add(count)
     return found
 
 
+def _symbol_ok(reads: tuple[PatchRead, ...], cell: int, count: int) -> bool:
+    return _all(
+        reads,
+        lambda read, count=count: (
+            read.kind == "symbol" and read.cell_px == cell and read.symbols == count and read.dot_ratio == 0.62
+        ),
+        dots_ok,
+    )
+
+
 def pair_ok(reads: tuple[PatchRead, ...], cell: int, ratio: float) -> bool:
     return _all(reads, lambda read: read.kind == "dot" and read.cell_px == cell and read.dot_ratio == ratio, dots_ok)
+
+
+def patch_passed(read: PatchRead) -> bool:
+    if read.kind == "qr":
+        return bool(read.decoded)
+    if read.kind == "tag":
+        return _tag_ok(read)
+    return dots_ok(read)
 
 
 def dots_ok(read: PatchRead) -> bool:

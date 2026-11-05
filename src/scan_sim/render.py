@@ -5,6 +5,7 @@ import numpy as np
 from common.config import PaperClipConfig
 from common.types import SymbolGrid
 from serialization.encode.encoder import compute_total_pages, payload_to_symbol_grids, prepare_payload
+from serialization.encode.fit_ecc import fill_config
 from serialization.encode.frame_payload import PreparedPayload
 from serialization.encode.pipeline import render_pages
 
@@ -25,6 +26,7 @@ def render_document(
     filename: str = "sample.bin",
     passphrase: str | None = None,
 ) -> tuple[list[np.ndarray], PreparedPayload, list[SymbolGrid]]:
+    config = fill_config(raw, config, filename)
     prepared = prepare_payload(raw, config, filename, passphrase)
     data_pages = compute_total_pages(len(prepared.payload), config)
     images = render_pages(Path(filename), config, prepared=prepared, passphrase=passphrase)

@@ -14,5 +14,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
       - run: uv sync --group dev
+      - run: npm ci
+        working-directory: web
+      - run: npm run typecheck
+        working-directory: web
       - run: uv run pytest -m "not slow"

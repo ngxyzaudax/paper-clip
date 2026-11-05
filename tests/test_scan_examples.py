@@ -8,6 +8,7 @@ from ml.real_batch import prepare_page, sample_real_batch
 from ml.scan_labels import labels_from_render
 from serialization.encode.encoder import payload_to_symbol_grids, prepare_payload
 from serialization.encode.pipeline import render_pages
+from serialization.encode.stripe import STRIPE
 
 
 def test_render_labels_match_written_symbols(tmp_path: Path) -> None:
@@ -19,7 +20,7 @@ def test_render_labels_match_written_symbols(tmp_path: Path) -> None:
     labels = labels_from_render(image, page_geometry(config), config)
     grid = np.asarray(payload_to_symbol_grids(prepared.payload, config, 1)[0])
     assert np.array_equal(labels[grid >= 0], grid[grid >= 0])
-    assert np.all(labels[(grid < 0) & (labels >= 0)] == 0)
+    assert np.all(labels[grid == STRIPE] == 1)
 
 
 def test_real_batch_uses_only_complete_windows() -> None:

@@ -1,9 +1,4 @@
-from common.format_spec import (
-    CELL_FIELD_MASK,
-    DOT_DIAMETER_RATIO,
-    DOT_RATIO_SCALE,
-    DOT_RATIO_SHIFT,
-)
+from common.format_spec import CELL_FIELD_MASK, DOT_RATIO_SCALE, DOT_RATIO_SHIFT
 
 
 def dot_ratio_index(ratio: float) -> int:
@@ -23,5 +18,5 @@ def unpack_cell_field(field: int) -> tuple[int, float]:
     cell = int(field) & CELL_FIELD_MASK
     index = (int(field) >> DOT_RATIO_SHIFT) & 0xF
     if index >= len(DOT_RATIO_SCALE):
-        return cell, DOT_DIAMETER_RATIO
+        raise ValueError(f"dot ratio index {index} is not a supported scale")
     return cell, DOT_RATIO_SCALE[index]

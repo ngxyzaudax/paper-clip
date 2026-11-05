@@ -1,19 +1,50 @@
 import pytest
 
-from calibration.sheet_field import tag_centers, written_cells
+from calibration.sheet_field import tag_centers, tag_quiet_mm, written_cells
 from calibration.sheet_place import sheet_side
-from calibration.sheet_spec import PAGE_H_MM, PAGE_W_MM
+from calibration.sheet_spec import CONTENT_MM, PAGE_H_MM, PAGE_W_MM, TAG_COLUMNS, TAG_ROWS
 
 
 def test_both_sides_fit_every_patch_on_a4() -> None:
     front, back = sheet_side("front"), sheet_side("back")
     _expect_fit(front)
     _expect_fit(back)
-    assert _counts(front.patches) == {"qr": 7, "tag": 6, "pitch": 2, "dot": 12, "symbol": 6}
-    assert _counts(back.patches) == {"qr": 1, "tag": 1, "pitch": 1, "dot": 12, "symbol": 10}
+    assert _counts(front.patches) == {"qr": 3, "tag": 3, "pitch": 0, "dot": 9, "symbol": 9}
+    assert _counts(back.patches) == {"qr": 0, "tag": 0, "pitch": 0, "dot": 15, "symbol": 25}
     assert {patch.name for patch in front.patches}.isdisjoint({patch.name for patch in back.patches})
-    assert {patch.name for patch in back.patches} >= {"qr-0.18", "tag-2", "pitch-12"}
-    assert {patch.cell_px for patch in back.patches if patch.kind == "dot"} == {16, 15, 14, 13}
+    assert {patch.cell_px for patch in front.patches if patch.kind == "dot"} == {15, 14, 13}
+    assert {patch.cell_px for patch in back.patches if patch.kind == "dot"} == {12, 11, 10, 9, 8}
+    _expect_full(front)
+    _expect_full(back)
+    _expect_symbol_gate(front)
+    _expect_symbol_gate(back)
+
+
+def _expect_full(side) -> None:
+    bottom = max(patch.y_mm + patch.h_mm for patch in side.patches)
+    right = max(patch.x_mm + patch.w_mm for patch in side.patches)
+    assert bottom >= PAGE_H_MM - CONTENT_MM - 0.05
+    assert right >= PAGE_W_MM - CONTENT_MM - 0.05
+    for patch in side.patches:
+        if patch.kind != "qr":
+            _expect_mesh(patch)
+
+
+def _expect_mesh(patch) -> None:
+    span = patch.tag_mm + 2.0 * tag_quiet_mm(patch.tag_mm)
+    width = (TAG_COLUMNS - 1) * patch.pitch_mm + span
+    height = (TAG_ROWS - 1) * patch.pitch_mm + span
+    assert patch.w_mm - width < 3.0, patch.name
+    assert patch.h_mm - height < 3.0, patch.name
+
+
+def _expect_symbol_gate(side) -> None:
+    cells = {patch.cell_px for patch in side.patches if patch.kind == "dot"}
+    gated = {
+        patch.cell_px for patch in side.patches
+        if patch.kind == "symbol" and patch.symbols == 11 and patch.dot_ratio == 0.62
+    }
+    assert cells == gated
 
 
 def _base(name: str) -> int:
@@ -24,6 +55,7 @@ def _expect_fit(side) -> None:
     assert {tag.tag_id for tag in side.frame} == set(range(_base(side.name), _base(side.name) + 16))
     ids = [tag_id for patch in side.patches for tag_id in patch.tag_ids]
     assert len(ids) == len(set(ids))
+    assert ids and min(ids) >= 10 and max(ids) < 500
     for patch in side.patches:
         assert 5.0 <= patch.x_mm
         assert 5.0 <= patch.y_mm

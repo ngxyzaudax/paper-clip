@@ -1,11 +1,6 @@
-from common.codec import (
-    calculate_ecc_symbols,
-    effective_block_size,
-    interleave_blocks,
-    rs_encode_block,
-)
+from common.codec import effective_block_size, interleave_blocks, rs_encode_block
 from common.compression import compress
-from common.config import BLOCK_SIZE, PaperClipConfig
+from common.config import PaperClipConfig
 from common.crypto import compute_sha256
 from common.encryption import DEFAULT_ENCRYPTION_PASSPHRASE, ENCRYPTION_OVERHEAD, encrypt
 from common.format_spec import FLAG_USER_PASSPHRASE
@@ -18,6 +13,7 @@ from common.page_layout import (
 from common.symbols import bytes_to_symbols
 from common.types import SymbolGrid
 from serialization.encode.frame_payload import PreparedPayload, frame_body, interleaved_length
+from serialization.encode.stripe import mark_unused
 
 
 def prepare_payload(
@@ -29,7 +25,7 @@ def prepare_payload(
     compressed = compress(raw)
     flags = FLAG_USER_PASSPHRASE if passphrase else 0
     blob = encrypt(compressed, passphrase if passphrase else DEFAULT_ENCRYPTION_PASSPHRASE)
-    ecc_symbols = calculate_ecc_symbols(BLOCK_SIZE, config.rs_redundancy)
+    ecc_symbols = config.ecc_sym
     block_size = effective_block_size(ecc_symbols)
     framed, num_blocks = frame_body(blob, filename, block_size)
     payload = _encode_blocks(framed, num_blocks, ecc_symbols)
@@ -46,7 +42,7 @@ def payload_byte_length_and_hash(
     compressed = compress(raw)
     blob_len = len(compressed) + ENCRYPTION_OVERHEAD
     name_len = len(filename.encode("utf-8")[:255])
-    ecc_symbols = calculate_ecc_symbols(BLOCK_SIZE, config.rs_redundancy)
+    ecc_symbols = config.ecc_sym
     total = interleaved_length(blob_len, name_len, ecc_symbols)
     return total, compute_sha256(raw)
 
@@ -67,7 +63,7 @@ def _sparse_symbol_grid(
     for index, (row, col) in enumerate(valid_order):
         if index < len(symbols):
             grid[row][col] = symbols[index]
-    return grid
+    return mark_unused(grid, valid_order)
 
 
 def payload_to_symbol_grids(

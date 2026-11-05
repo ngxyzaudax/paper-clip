@@ -1,0 +1,52 @@
+.modes {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+}
+
+.mode {
+  border: 0;
+  border-radius: 999px;
+  padding: 4px 12px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+.mode:hover {
+  color: var(--ink);
+}
+
+.chosen {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.chosen:hover {
+  color: var(--accent-ink);
+}
+
+.tip {
+  z-index: 80;
+  max-width: 280px;
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+.hidden {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}

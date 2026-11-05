@@ -1,0 +1,7 @@
+.heat { display: grid; gap: 3px; }
+.heat span { width: 18px; height: 14px; border-radius: 2px; }
+.column { display: grid; gap: 12px; }
+.gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.card { display: grid; gap: 8px; align-content: start; }
+.card img { width: 100%; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); }
+.meta { color: var(--muted); font-size: 12px; }

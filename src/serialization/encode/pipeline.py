@@ -5,10 +5,9 @@ from PIL import Image
 
 from common.config import PaperClipConfig
 from common.perf import log_phase
-from serialization.encode.encoder import compute_total_pages, payload_to_symbol_grids, prepare_payload
 from serialization.encode.frame_payload import PreparedPayload
-from serialization.encode.parity_render import OnPageComplete, render_parity_pages
-from serialization.encode.renderer import render_page
+from serialization.encode.page_images import document_plan, each_page
+from serialization.encode.parity_render import OnPageComplete, OnPageImage
 
 logger = logging.getLogger(__name__)
 
@@ -19,40 +18,16 @@ def render_pages(
     on_page_complete: OnPageComplete | None = None,
     passphrase: str | None = None,
     prepared: PreparedPayload | None = None,
+    duplex: bool = False,
 ) -> list[Image.Image]:
-    if prepared is None:
-        with log_phase(logger, "render_pages.read_input"):
-            raw_data = input_path.read_bytes()
-        logger.info("Read %d bytes from %s", len(raw_data), input_path)
-        with log_phase(logger, "render_pages.prepare_payload"):
-            prepared = prepare_payload(raw_data, config, filename=input_path.name, passphrase=passphrase)
-    data_pages = compute_total_pages(len(prepared.payload), config)
-    total_pages = data_pages + config.redundancy_pages
-    logger.info(
-        "Rendering %d data + %d parity = %d page(s)",
-        data_pages, config.redundancy_pages, total_pages,
-    )
-    with log_phase(logger, "render_pages.payload_to_symbol_grids"):
-        grids = payload_to_symbol_grids(prepared.payload, config, data_pages)
+    config, prepared, data_pages, total_pages = document_plan(input_path, config, passphrase, prepared)
+    _log_plan(data_pages, config.redundancy_pages, total_pages)
     images: list[Image.Image] = []
-    with log_phase(logger, "render_pages.render_data_pages"):
-        for page_idx, grid in enumerate(grids):
-            image = render_page(grid, page_idx, total_pages, data_pages, prepared, config)
+    with log_phase(logger, "render_pages.render"):
+        for page_idx, image in each_page(config, prepared, data_pages, total_pages, duplex):
             images.append(image)
-            if on_page_complete:
-                on_page_complete(page_idx, total_pages, None)
-    if config.redundancy_pages > 0:
-        with log_phase(logger, "render_pages.render_parity_pages"):
-            images.extend(render_parity_pages(
-                prepared.payload, config, data_pages, total_pages, prepared, on_page_complete,
-            ))
+            _notify_path(on_page_complete, page_idx, total_pages, None)
     return images
-
-
-def _output_paths(base: Path, count: int) -> list[Path]:
-    if count == 1:
-        return [base.with_suffix(".png")]
-    return [base.parent / f"{base.stem}_{index + 1:03d}.png" for index in range(count)]
 
 
 def encode(
@@ -62,12 +37,40 @@ def encode(
     on_page_complete: OnPageComplete | None = None,
     passphrase: str | None = None,
     prepared: PreparedPayload | None = None,
+    on_page_image: OnPageImage | None = None,
+    duplex: bool = False,
 ) -> list[Path]:
-    images = render_pages(input_path, config, on_page_complete, passphrase, prepared=prepared)
+    config, prepared, data_pages, total_pages = document_plan(input_path, config, passphrase, prepared)
+    _log_plan(data_pages, config.redundancy_pages, total_pages)
     output_base.parent.mkdir(parents=True, exist_ok=True)
-    paths = _output_paths(output_base, len(images))
+    paths = _output_paths(output_base, total_pages)
+    written: list[Path] = []
     with log_phase(logger, "encode.write_png_files"):
-        for img, path in zip(images, paths):
-            img.save(str(path), format="PNG", compress_level=1, dpi=(config.print_dpi, config.print_dpi))
-            logger.info("Saved %s (%dx%d, lossless PNG @ %d dpi)", path, img.width, img.height, config.print_dpi)
-    return paths
+        for page_idx, image in each_page(config, prepared, data_pages, total_pages, duplex):
+            path = paths[page_idx]
+            _save_page(image, path, config.print_dpi)
+            written.append(path)
+            _notify_path(on_page_complete, page_idx, total_pages, path)
+            if on_page_image:
+                on_page_image(page_idx, total_pages, image)
+    return written
+
+
+def _output_paths(base: Path, count: int) -> list[Path]:
+    if count == 1:
+        return [base.with_suffix(".png")]
+    return [base.parent / f"{base.stem}_{index + 1:03d}.png" for index in range(count)]
+
+
+def _save_page(image: Image.Image, path: Path, dpi: int) -> None:
+    image.save(str(path), format="PNG", compress_level=1, dpi=(dpi, dpi))
+    logger.info("Saved %s (%dx%d, lossless PNG @ %d dpi)", path, image.width, image.height, dpi)
+
+
+def _notify_path(callback: OnPageComplete | None, page_idx: int, total: int, path: Path | None) -> None:
+    if callback:
+        callback(page_idx, total, path)
+
+
+def _log_plan(data_pages: int, parity_pages: int, total_pages: int) -> None:
+    logger.info("Rendering %d data + %d parity = %d page(s)", data_pages, parity_pages, total_pages)

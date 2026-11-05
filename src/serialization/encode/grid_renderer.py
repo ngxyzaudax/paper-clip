@@ -5,6 +5,7 @@ from common.drawing import draw_dot_cell
 from common.page_layout import data_grid_region, margin_offset
 from common.palette import palette_from_config
 from common.types import SymbolGrid
+from serialization.encode.stripe import STRIPE
 
 
 def render_data_grid(
@@ -19,10 +20,13 @@ def render_data_grid(
     y_base = my + region.y
     for row_idx, row in enumerate(grid):
         for col_idx, symbol_idx in enumerate(row):
-            if symbol_idx < 0:
-                continue
             x = x_base + col_idx * cell
             y = y_base + row_idx * cell
+            if symbol_idx == STRIPE:
+                draw.rectangle([x, y, x + cell - 1, y + cell - 1], fill=(0, 0, 0))
+                continue
+            if symbol_idx < 0:
+                continue
             color = palette[symbol_idx - 1] if symbol_idx > 0 else None
             draw_dot_cell(draw, x, y, cell, color, config.dot_ratio)
     return image

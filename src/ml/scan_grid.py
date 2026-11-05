@@ -17,7 +17,7 @@ from serialization.decode.detect_tags import detect_tags
 from serialization.decode.errors import DecodeError
 from serialization.decode.header_config import config_from_header
 from serialization.decode.load_scan import load_scans
-from serialization.decode.read_qr import read_qr_header
+from serialization.decode.read_qr import locate_qr_headers
 from serialization.decode.restore import restore_page
 from serialization.decode.warp_mesh import warp_page
 
@@ -44,13 +44,18 @@ def load_page_examples(directory: Path) -> list[PageExample]:
 
 
 def build_page_example(scan: np.ndarray, digital_paths: list[Path]) -> PageExample:
-    rotated, header, points = read_qr_header(scan)
+    located = locate_qr_headers(scan)
+    if located is None:
+        raise DecodeError("page header not found")
+    rotated, hits = located
+    header = hits[0].header
     if header.page_index >= len(digital_paths):
         raise DecodeError(f"scan is page {header.page_index + 1} but only {len(digital_paths)} digital pages exist")
     config = config_from_header(header)
     geometry = page_geometry(config)
     detected = detect_tags(rotated, {tag.tag_id for tag in geometry.tags})
-    warped = warp_page(rotated, geometry, detected, points)
+    quads = tuple(hit.points for hit in hits if len(hit.points) == 4)
+    warped = warp_page(rotated, geometry, detected, quads[0] if quads else None, tuple(quads[1:]))
     image = _resize_grid(warped, geometry)
     labels = labels_from_render(_open_rgb(digital_paths[header.page_index]), geometry, config)
     agreement = _agreement(warped, geometry, config, labels)
